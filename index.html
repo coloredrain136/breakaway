@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#05080d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Breakaway">
+<title>Breakaway</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="stylesheet" href="/vendor/leaflet.css">
+<style>
+/* ---------- Tokens ---------- */
+:root{
+  --bg:#05080d; --bg2:#0a1220;
+  --ink:#eef6ff; --ink2:rgba(238,246,255,.68); --ink3:rgba(238,246,255,.42);
+  --accent:#7fd6ff; --accent2:#c4efff; --accentDim:rgba(127,214,255,.16); --accentLine:rgba(127,214,255,.38);
+  --ok:#5be3a0; --warn:#ffc864; --bad:#ff6f6f;
+  --glass:linear-gradient(180deg,rgba(255,255,255,.085),rgba(255,255,255,.032));
+  --glass2:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.05));
+  --stroke:rgba(255,255,255,.10); --stroke2:rgba(255,255,255,.18);
+  --spec:inset 0 1px 0 rgba(255,255,255,.14);
+  --shadow:0 12px 34px rgba(0,0,0,.42);
+  --r1:24px; --r2:18px; --r3:13px; --r4:999px;
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:20px; --s6:28px;
+  --blur:blur(22px) saturate(150%);
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Helvetica Neue",Arial,sans-serif;
+  --topPad:calc(env(safe-area-inset-top) + 14px);
+}
+html.standalone{--topPad:calc(env(safe-area-inset-top) + 26px)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%}
+body{min-height:100vh;background:
+  radial-gradient(120% 60% at 15% -10%,rgba(80,170,230,.20),transparent 60%),
+  radial-gradient(90% 50% at 110% 10%,rgba(120,200,255,.12),transparent 60%),
+  linear-gradient(180deg,var(--bg2),var(--bg) 55%);background-attachment:fixed}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+.wrap{max-width:560px;margin:0 auto;padding:var(--topPad) var(--s4) calc(env(safe-area-inset-bottom) + 40px)}
+.num{font-variant-numeric:tabular-nums}
+.hidden{display:none!important}
+
+/* ---------- Glass ---------- */
+.card{background:var(--glass);border:1px solid var(--stroke);border-radius:var(--r1);box-shadow:var(--spec),var(--shadow);
+  -webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);padding:var(--s4);margin-bottom:var(--s3)}
+.card h2{font-size:13px;font-weight:650;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);margin:0 0 var(--s3)}
+.card h3{font-size:17px;font-weight:650;margin:0 0 var(--s2)}
+.sub{color:var(--ink2);font-size:14px;line-height:1.4}
+.tiny{color:var(--ink3);font-size:12px;line-height:1.4}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 var(--s4);border-radius:var(--r3);
+  border:1px solid var(--stroke2);background:var(--glass2);box-shadow:var(--spec);font-weight:600;font-size:15px;color:var(--ink);text-decoration:none;
+  transition:transform .12s ease,background .2s}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:linear-gradient(180deg,#9fe2ff,#5cc4f2);color:#04131d;border-color:rgba(255,255,255,.4);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),0 6px 18px rgba(92,196,242,.32)}
+.btn.danger{color:#ffd2d2;border-color:rgba(255,111,111,.4);background:linear-gradient(180deg,rgba(255,111,111,.22),rgba(255,111,111,.08))}
+.btn.confirm{background:linear-gradient(180deg,#ff8a8a,#e65454);color:#fff;border-color:rgba(255,255,255,.35)}
+.btn.ok{color:#d6ffe9;border-color:rgba(91,227,160,.4);background:linear-gradient(180deg,rgba(91,227,160,.24),rgba(91,227,160,.08))}
+.btn:disabled{opacity:.45;pointer-events:none}
+.btn.block{width:100%}
+.row{display:flex;gap:var(--s2);align-items:center}
+.row.wrapr{flex-wrap:wrap}
+.grow{flex:1;min-width:0}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:var(--r4);font-size:13px;font-weight:600;border:1px solid var(--stroke2);background:var(--glass2);white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ink3);flex:none}
+.dot.ok{background:var(--ok);box-shadow:0 0 10px var(--ok)}
+.dot.warn{background:var(--warn)}
+.dot.bad{background:var(--bad)}
+.dot.live{background:var(--bad);box-shadow:0 0 0 0 rgba(255,111,111,.7);animation:livepulse 1.6s infinite}
+@keyframes livepulse{0%{box-shadow:0 0 0 0 rgba(255,111,111,.6)}70%{box-shadow:0 0 0 8px rgba(255,111,111,0)}100%{box-shadow:0 0 0 0 rgba(255,111,111,0)}}
+
+input.field,textarea.field,select.field{width:100%;min-height:44px;padding:10px 12px;border-radius:var(--r3);border:1px solid var(--stroke2);
+  background:rgba(0,0,0,.28);color:var(--ink);font-size:16px;outline:none;-webkit-appearance:none;appearance:none}
+input.field:focus,textarea.field:focus{border-color:var(--accentLine);box-shadow:0 0 0 3px var(--accentDim)}
+input[type=datetime-local].field,input[type=date].field{display:block}
+label.lbl{display:block;font-size:13px;color:var(--ink2);margin:var(--s3) 0 6px;font-weight:550}
+
+/* ---------- Header ---------- */
+.top{display:flex;align-items:center;justify-content:space-between;gap:var(--s3);margin:2px 2px var(--s3)}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.brand img{width:34px;height:34px;border-radius:9px;box-shadow:0 4px 14px rgba(0,0,0,.4)}
+.brand .t1{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:700}
+.brand .t2{font-size:18px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ---------- Map ---------- */
+.mapcard{position:relative;padding:0;overflow:hidden;height:clamp(300px,50vh,470px)}
+#map,#pmap{position:absolute;inset:0;background:#0b1320}
+.leaflet-container{background:#0b1320;font-family:var(--font)}
+.leaflet-control-attribution{background:rgba(5,8,13,.6)!important;color:var(--ink3)!important;font-size:10px!important;border-top-left-radius:8px}
+.leaflet-control-attribution a{color:var(--ink2)!important}
+.mapbtns{position:absolute;top:10px;right:10px;z-index:500;display:flex;flex-direction:column;gap:8px}
+.mapbtn{min-height:36px;padding:0 12px;border-radius:var(--r4);border:1px solid var(--stroke2);background:rgba(10,18,30,.72);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);
+  color:var(--ink);font-size:13px;font-weight:600;box-shadow:var(--spec),0 4px 14px rgba(0,0,0,.35)}
+.mapbtn.on{color:#04131d;background:linear-gradient(180deg,#9fe2ff,#5cc4f2)}
+.rider{position:relative}
+.rider .core{position:absolute;left:-9px;top:-9px;width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid var(--accent);box-shadow:0 0 14px rgba(127,214,255,.9)}
+.rider .ring{position:absolute;left:-9px;top:-9px;width:18px;height:18px;border-radius:50%;border:2px solid var(--accent);animation:ring 2s ease-out infinite}
+.rider.stale .core{border-color:var(--warn);box-shadow:0 0 12px rgba(255,200,100,.7)}
+.rider.stale .ring{border-color:var(--warn)}
+@keyframes ring{0%{transform:scale(1);opacity:.9}100%{transform:scale(3.4);opacity:0}}
+.flag{width:14px;height:14px;border-radius:4px;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.5)}
+.flag.s{background:var(--ok)}
+.flag.f{background:repeating-conic-gradient(#000 0 25%,#fff 0 50%) 0 0/7px 7px}
+
+/* ---------- Stats ---------- */
+.hero{text-align:center;padding:var(--s5) var(--s4)}
+.hero .k{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);font-weight:650}
+.hero .big{font-size:52px;font-weight:750;letter-spacing:-.02em;margin:6px 0 4px;background:linear-gradient(180deg,#fff,var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:var(--s2);padding:var(--s2)}
+.stat{padding:var(--s3) var(--s3) 10px;border-radius:var(--r2);background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.06)}
+.stat .k{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);font-weight:650}
+.stat .v{font-size:30px;font-weight:720;letter-spacing:-.02em;margin-top:2px;line-height:1.1}
+.stat .v small{font-size:14px;font-weight:600;color:var(--ink2);margin-left:3px;letter-spacing:0}
+.stat.wide{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between}
+.stat.wide .v{font-size:26px}
+.prog{height:8px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden;margin:4px var(--s2) var(--s2)}
+.prog i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,#4fb6e8,var(--accent2));box-shadow:0 0 12px rgba(127,214,255,.6);transition:width .8s ease}
+.seen{display:flex;align-items:center;justify-content:space-between;gap:var(--s2);padding:var(--s3) var(--s4)}
+.seen .msg{font-size:14px;color:var(--ink2);line-height:1.35}
+.zone{margin-top:6px;padding:10px 12px;border-radius:var(--r3);background:rgba(255,200,100,.10);border:1px solid rgba(255,200,100,.28);color:#ffe2a8;font-size:14px;line-height:1.35}
+
+/* ---------- Cheers ---------- */
+.quick{display:grid;grid-template-columns:repeat(5,1fr);gap:var(--s2);margin:var(--s3) 0}
+.qbtn{position:relative;height:64px;border-radius:var(--r2);border:1px solid var(--stroke2);background:var(--glass2);box-shadow:var(--spec);font-size:28px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;transition:transform .1s}
+.qbtn:active{transform:scale(.92)}
+.qbtn .c{font-size:11.5px;font-weight:700;color:var(--ink2);font-variant-numeric:tabular-nums;line-height:1}
+.qbtn.pop{animation:pop .35s ease}
+@keyframes pop{40%{transform:scale(1.14)}}
+.msgbox{display:flex;gap:var(--s2);align-items:stretch}
+.msgbox .btn{flex:none;min-width:76px}
+.feed{list-style:none;margin:var(--s3) 0 0;padding:0;max-height:360px;overflow:auto;-webkit-overflow-scrolling:touch}
+.feed li{display:flex;gap:10px;padding:10px 2px;border-top:1px solid rgba(255,255,255,.06);font-size:15px;line-height:1.35}
+.feed li:first-child{border-top:0}
+.feed .who{font-weight:650}
+.feed .when{margin-left:auto;color:var(--ink3);font-size:12px;white-space:nowrap;padding-left:8px}
+.feed .av{flex:none;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;background:var(--accentDim);color:var(--accent2);border:1px solid var(--accentLine)}
+.feed li.new{animation:fadein .5s ease}
+@keyframes fadein{from{opacity:0;transform:translateY(-4px)}}
+.feed .hid{opacity:.45;text-decoration:line-through}
+
+/* ---------- Sheet / toast ---------- */
+.scrim{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center;padding:var(--s4) var(--s4) calc(env(safe-area-inset-bottom) + var(--s4))}
+.sheet{width:100%;max-width:520px;animation:up .25s ease}
+@keyframes up{from{transform:translateY(30px);opacity:0}}
+.toast{position:fixed;left:50%;top:calc(var(--topPad) + 4px);transform:translateX(-50%);z-index:1100;padding:10px 16px;border-radius:var(--r4);background:rgba(16,26,40,.9);border:1px solid var(--stroke2);
+  -webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);font-size:14px;font-weight:600;box-shadow:var(--shadow);max-width:90vw;text-align:center}
+.update{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 16px);transform:translateX(-50%);z-index:1100}
+
+/* ---------- Admin ---------- */
+.kv{display:flex;justify-content:space-between;gap:var(--s3);padding:9px 0;border-top:1px solid rgba(255,255,255,.06);font-size:15px}
+.kv:first-of-type{border-top:0}
+.kv .k{color:var(--ink2)}
+.kv .v{text-align:right;font-weight:600}
+.statusbig{display:flex;align-items:center;gap:10px;font-size:24px;font-weight:720;margin-bottom:var(--s2)}
+.btngrid{display:grid;grid-template-columns:1fr 1fr;gap:var(--s2);margin-top:var(--s3)}
+.copyrow{display:flex;gap:var(--s2);align-items:center;margin-top:6px}
+.copyrow code{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:13px ui-monospace,SFMono-Regular,Menlo,monospace;padding:11px 12px;border-radius:var(--r3);background:rgba(0,0,0,.32);border:1px solid var(--stroke)}
+.copyrow .btn{min-height:40px;flex:none}
+.toggle{display:flex;align-items:center;justify-content:space-between;gap:var(--s3);padding:6px 0}
+.sw{position:relative;width:52px;height:32px;flex:none}
+.sw input{opacity:0;width:0;height:0;position:absolute}
+.sw span{position:absolute;inset:0;border-radius:99px;background:rgba(255,255,255,.16);border:1px solid var(--stroke2);transition:.2s}
+.sw span::after{content:"";position:absolute;left:3px;top:3px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.4);transition:.2s}
+.sw input:checked+span{background:var(--warn)}
+.sw input:checked+span::after{transform:translateX(20px)}
+.pmapwrap{position:relative;height:220px;border-radius:var(--r2);overflow:hidden;margin-top:var(--s3);border:1px solid var(--stroke)}
+ol.tips{margin:var(--s2) 0 0;padding-left:20px;color:var(--ink2);font-size:14px;line-height:1.55}
+ol.tips b{color:var(--ink)}
+.chk{display:inline-flex;align-items:center;gap:6px;font-size:13px;margin:3px 10px 3px 0}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="/vendor/leaflet.js"></script>
+<script>
+'use strict';
+const APP_VERSION = 'breakaway-1';
+const QUICK = ['🔥', '👏', '💪', '🚴', '❄️'];
+const MI = 1609.344;
+if (navigator.standalone || matchMedia('(display-mode: standalone)').matches) document.documentElement.classList.add('standalone');
+
+// ---------- utils ----------
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+  del(k) { try { localStorage.removeItem(k); } catch {} }
+};
+let skew = 0; // server clock − device clock
+const now = () => Date.now() + skew;
+function clock(iso) { if (!iso) return '—'; return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
+function dayLabel(iso) { return new Date(iso).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }); }
+function dur(sec) {
+  if (sec == null || !isFinite(sec)) return '—';
+  sec = Math.max(0, Math.floor(sec));
+  const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60;
+  return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
+}
+function countdown(sec) {
+  if (sec > 86400) { const d = Math.floor(sec / 86400), h = Math.floor(sec % 86400 / 3600); return `${d}d ${h}h`; }
+  return dur(sec);
+}
+function ago(iso) {
+  if (!iso) return 'Never';
+  const s = Math.max(0, Math.round((now() - Date.parse(iso)) / 1000));
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 48) return `${h}h ${m % 60}m ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+function shortAgo(iso) { return ago(iso).replace(' ago', ''); }
+function toast(msg, ms = 2400) {
+  const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.appendChild(t);
+  setTimeout(() => t.remove(), ms);
+}
+let updateShown = false;
+function showUpdate() {
+  if (updateShown) return; updateShown = true;
+  const b = document.createElement('button'); b.className = 'btn primary update'; b.textContent = 'Update Ready · Tap to Reload';
+  b.onclick = () => location.reload(); document.body.appendChild(b);
+}
+async function copy(text) {
+  try { await navigator.clipboard.writeText(text); }
+  catch { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+  toast('Copied');
+}
+function deviceId() {
+  let d = store.get('ba_device');
+  if (!d) { d = 'd' + Math.random().toString(36).slice(2) + Date.now().toString(36); store.set('ba_device', d); }
+  return d;
+}
+function tiles() {
+  return {
+    map: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { subdomains: 'abcd', maxZoom: 19, attribution: '© OpenStreetMap © CARTO' }),
+    sat: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Imagery © Esri' })
+  };
+}
+function flagIcon(cls) { return L.divIcon({ className: '', html: `<div class="flag ${cls}"></div>`, iconSize: [14, 14], iconAnchor: [7, 7] }); }
+function drawCourse(map, pts, layerGroup) {
+  layerGroup.clearLayers();
+  if (!pts || pts.length < 2) return null;
+  const ll = pts.map((p) => [p[0], p[1]]);
+  L.polyline(ll, { color: '#02060b', weight: 8, opacity: .55, interactive: false }).addTo(layerGroup);
+  L.polyline(ll, { color: '#7fd6ff', weight: 4, opacity: .42, interactive: false }).addTo(layerGroup);
+  L.marker(ll[0], { icon: flagIcon('s'), interactive: false, keyboard: false }).addTo(layerGroup);
+  L.marker(ll[ll.length - 1], { icon: flagIcon('f'), interactive: false, keyboard: false }).addTo(layerGroup);
+  return L.latLngBounds(ll);
+}
+
+// ---------- routing ----------
+const params = new URLSearchParams(location.search);
+const urlKey = params.get('k');
+if (urlKey) store.set('ba_view', urlKey);
+function route() {
+  const wantAdmin = location.hash === '#admin' || location.pathname === '/admin';
+  if (urlKey && !wantAdmin) return Live(urlKey);
+  if (wantAdmin) return Admin();
+  if (store.get('ba_admin')) return Admin();
+  if (store.get('ba_view')) return Live(store.get('ba_view'));
+  return Landing();
+}
+window.addEventListener('hashchange', () => location.reload());
+
+function Landing() {
+  $('#app').innerHTML = `<div class="wrap"><div class="top"><div class="brand"><img src="/icons/icon-192.png" alt=""><div><div class="t1">Breakaway</div><div class="t2">Live Race Tracking</div></div></div></div>
+  <div class="card hero"><div class="k">Following Someone?</div><h3 style="margin-top:10px">Open the Share Link They Sent You</h3><p class="sub">This page needs the full link (it ends in <b>?k=…</b>).</p></div>
+  <a class="btn block" href="/#admin">Admin</a></div>`;
+}
+
+// =====================================================================
+// LIVE (spectator)
+// =====================================================================
+function Live(key) {
+  let S = null, course = null, courseVer = -1, trail = [], lastId = 0, epoch = 0;
+  let follow = true, firstFit = false, zoomedToRider = false, timer = null, inflight = false, failCount = 0;
+  let pendingTaps = {}, tapTimer = null, localBump = {}, feedSeen = new Set(), msgCooldownUntil = 0;
+  let name = store.get('ba_name') || '';
+
+  $('#app').innerHTML = `<div class="wrap">
+    <div class="top">
+      <div class="brand"><img src="/icons/icon-192.png" alt=""><div style="min-width:0"><div class="t1">Breakaway</div><div class="t2" id="rname">Loading…</div></div></div>
+      <span class="pill" id="chip"><span class="dot"></span><span>…</span></span>
+    </div>
+    <div id="heroSlot"></div>
+    <div class="card mapcard"><div id="map"></div>
+      <div class="mapbtns"><button class="mapbtn hidden" id="followBtn">Follow</button><button class="mapbtn" id="layerBtn">Satellite</button></div>
+    </div>
+    <div class="card" style="padding:0" id="statsCard">
+      <div class="stats">
+        <div class="stat"><div class="k">Miles Done</div><div class="v num" id="sDone">—</div></div>
+        <div class="stat"><div class="k">Miles Left</div><div class="v num" id="sLeft">—</div></div>
+        <div class="stat"><div class="k">Current Speed</div><div class="v num" id="sSpeed">—</div></div>
+        <div class="stat"><div class="k">ETA to Finish</div><div class="v num" id="sEta">—</div></div>
+        <div class="stat wide"><div class="k">Elapsed</div><div class="v num" id="sElapsed">—</div></div>
+      </div>
+      <div class="prog"><i id="progBar"></i></div>
+      <div class="seen"><div class="row"><span class="dot" id="seenDot"></span><span class="msg" id="seenTxt">Waiting for GPS…</span></div><span class="pill num" id="batt">🔋 —</span></div>
+      <div id="zoneSlot" style="padding:0 var(--s4) var(--s3)"></div>
+    </div>
+    <div class="card" id="cheerCard">
+      <h3 id="cheerTitle">Send a Cheer</h3>
+      <div class="sub">Pops up on his Apple Watch mid-race. Tap as many as you want.</div>
+      <div class="quick">${QUICK.map((e) => `<button class="qbtn" data-e="${e}" aria-label="Cheer ${e}"><span>${e}</span><span class="c num">0</span></button>`).join('')}</div>
+      <div class="msgbox"><input class="field grow" id="msg" maxlength="140" placeholder="Write a message…" enterkeyhint="send" autocomplete="off"><button class="btn primary" id="sendBtn">Send</button></div>
+      <div class="row" style="justify-content:space-between;margin-top:6px"><span class="tiny" id="asName"></span><span class="tiny num" id="msgCount">0/140</span></div>
+      <ul class="feed" id="feed"></ul>
+    </div>
+    <p class="tiny" style="text-align:center;margin-top:var(--s4)">GPS from his phone · not official timing · ${APP_VERSION}</p>
+  </div>`;
+
+  // map
+  const map = L.map('map', { zoomControl: false, attributionControl: true, tap: true }).setView([44.73, -85.37], 10);
+  map.attributionControl.setPrefix(false);
+  const T = tiles(); let layer = 'map'; T.map.addTo(map);
+  const courseLayer = L.layerGroup().addTo(map);
+  const trailLine = L.polyline([], { color: '#7fd6ff', weight: 5, opacity: .95, lineJoin: 'round', interactive: false }).addTo(map);
+  let rider = null, courseBounds = null;
+  map.on('dragstart', () => { if (S && S.cur) { follow = false; $('#followBtn').classList.remove('hidden'); } });
+  $('#followBtn').onclick = () => { follow = true; $('#followBtn').classList.add('hidden'); if (S && S.cur) map.setView([S.cur.lat, S.cur.lon], Math.max(map.getZoom(), 14)); };
+  $('#layerBtn').onclick = () => {
+    map.removeLayer(T[layer]); layer = layer === 'map' ? 'sat' : 'map'; T[layer].addTo(map);
+    $('#layerBtn').textContent = layer === 'map' ? 'Satellite' : 'Map';
+  };
+
+  async function loadCourse() {
+    const r = await fetch(`/api/state?k=${encodeURIComponent(key)}&part=course`, { cache: 'no-store' });
+    const j = await r.json();
+    course = j.course; courseVer = j.courseVersion;
+    courseBounds = drawCourse(map, course && course.pts, courseLayer);
+    trailLine.bringToFront();
+    if (courseBounds && (!S || !S.cur || !follow)) { map.fitBounds(courseBounds, { padding: [24, 24] }); firstFit = true; }
+  }
+
+  async function poll() {
+    if (inflight) return; inflight = true; clearTimeout(timer);
+    try {
+      const r = await fetch(`/api/state?k=${encodeURIComponent(key)}&since=${lastId}&epoch=${epoch}`, { cache: 'no-store' });
+      if (r.status === 403) { badLink(); return; }
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || r.status);
+      failCount = 0;
+      if (j.now) skew = Date.parse(j.now) - Date.now();
+      if (j.v && j.v !== APP_VERSION) showUpdate();
+      if (j.epoch !== epoch) { trail = []; lastId = 0; epoch = j.epoch; if (j.points && j.points.length && j.points[0][0] > 0) {} }
+      for (const p of j.points || []) { trail.push([p[1], p[2]]); lastId = Math.max(lastId, p[0]); }
+      S = j;
+      if (j.courseVersion !== courseVer) await loadCourse();
+      render();
+    } catch (e) {
+      failCount++;
+      if (failCount >= 2) $('#seenTxt').textContent = 'Can’t reach Breakaway right now. Retrying…';
+    } finally {
+      inflight = false; schedule();
+    }
+  }
+  function schedule() {
+    clearTimeout(timer);
+    if (document.hidden) return;
+    let ms = 10000;
+    if (!S || failCount) ms = 15000;
+    else if (S.status === 'finished') ms = 60000;
+    else if (S.status === 'not_started' || S.status === 'setup') {
+      const until = S.plannedStart ? Date.parse(S.plannedStart) - now() : Infinity;
+      ms = until < 40 * 60000 ? 10000 : 30000;
+    }
+    timer = setTimeout(poll, ms);
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); else clearTimeout(timer); });
+
+  function badLink() {
+    store.del('ba_view');
+    $('#app').innerHTML = `<div class="wrap"><div class="card hero"><div class="k">Link Problem</div><h3 style="margin-top:10px">This Share Link Isn’t Working</h3><p class="sub">Ask for the link again. It should end in <b>?k=…</b></p></div></div>`;
+  }
+
+  function render() {
+    if (!S) return;
+    const rn = S.rider || 'Joe';
+    $('#rname').textContent = S.name || 'Breakaway';
+    document.title = `${rn} · ${S.name || 'Breakaway'}`;
+    $('#cheerTitle').textContent = `Send ${rn} a Cheer`;
+    // chip
+    const chip = $('#chip');
+    if (S.status === 'live') chip.innerHTML = `<span class="dot live"></span><span>Live</span>`;
+    else if (S.status === 'finished') chip.innerHTML = `<span class="dot ok"></span><span>Finished</span>`;
+    else chip.innerHTML = `<span class="dot"></span><span>Not Started</span>`;
+
+    // hero
+    const hero = $('#heroSlot');
+    if (S.status === 'finished') {
+      const t = S.startedAt && S.finishedAt ? (Date.parse(S.finishedAt) - Date.parse(S.startedAt)) / 1000 : null;
+      hero.innerHTML = `<div class="card hero"><div class="k">${esc(rn)} Finished 🎉</div><div class="big num">${dur(t)}</div>
+        <div class="sub">${S.avgMph ? `Avg ${S.avgMph} mph · ` : ''}Crossed at ${clock(S.finishedAt)}</div>
+        <div class="tiny" style="margin-top:8px">GPS time, not official. Full breakdown coming soon.</div></div>`;
+    } else if (S.status === 'not_started' || S.status === 'setup') {
+      const ps = S.plannedStart;
+      hero.innerHTML = ps ? `<div class="card hero"><div class="k" id="cdLabel">Starts In</div><div class="big num" id="cd">—</div>
+        <div class="sub">${esc(rn)}’s wave · ${clock(ps)} · ${dayLabel(ps)}</div></div>`
+        : `<div class="card hero"><div class="k">Coming Soon</div><h3 style="margin-top:8px">Start Time Not Set Yet</h3><div class="sub">Check back on race morning.</div></div>`;
+    } else hero.innerHTML = '';
+
+    // stats
+    const live = S.status === 'live', fin = S.status === 'finished';
+    $('#statsCard').classList.toggle('hidden', !live && !fin && !S.cur);
+    $('#sDone').innerHTML = S.milesDone != null ? `${S.milesDone.toFixed(1)}<small>mi</small>` : '—';
+    $('#sLeft').innerHTML = S.milesLeft != null ? `${S.milesLeft.toFixed(1)}<small>mi</small>` : '—';
+    $('#sSpeed').innerHTML = live && S.speedMph != null ? `${S.speedMph.toFixed(1)}<small>mph</small>` : (fin && S.avgMph ? `${S.avgMph}<small>avg</small>` : '—');
+    $('#sEta').innerHTML = live && S.eta ? clock(S.eta) : (fin ? clock(S.finishedAt) : '—');
+    const pct = S.courseMiles && S.milesDone != null ? Math.min(100, (S.milesDone / S.courseMiles) * 100) : 0;
+    $('#progBar').style.width = pct + '%';
+    $('#batt').textContent = S.battery != null ? `🔋 ${Math.round(S.battery)}%` : '🔋 —';
+    $('#batt').classList.toggle('hidden', fin);
+
+    // map
+    trailLine.setLatLngs(trail);
+    if (S.cur) {
+      const ll = [S.cur.lat, S.cur.lon];
+      if (!rider) {
+        rider = L.marker(ll, { icon: L.divIcon({ className: 'rider', html: '<div class="ring"></div><div class="core"></div>', iconSize: [0, 0] }), zIndexOffset: 1000, interactive: false }).addTo(map);
+      } else rider.setLatLng(ll);
+      const stale = now() - Date.parse(S.cur.ts) > 180000;
+      rider.getElement() && rider.getElement().classList.toggle('stale', stale);
+      if (follow && live) {
+        if (!zoomedToRider) { map.setView(ll, 14); zoomedToRider = true; } else map.panTo(ll, { animate: true });
+      }
+    } else if (rider) { map.removeLayer(rider); rider = null; }
+    if (fin && trail.length > 1 && !firstFitFinished) { firstFitFinished = true; map.fitBounds(courseBounds || trailLine.getBounds(), { padding: [24, 24] }); }
+
+    // cheers
+    for (const b of document.querySelectorAll('.qbtn')) {
+      const e = b.dataset.e; const n = (S.totals?.[e] || 0) + (localBump[e] || 0);
+      b.querySelector('.c').textContent = n > 999 ? Math.round(n / 100) / 10 + 'k' : n;
+    }
+    renderFeed();
+    tick();
+  }
+  let firstFitFinished = false;
+
+  function renderFeed() {
+    const ul = $('#feed');
+    const items = S.feed || [];
+    if (!items.length) { ul.innerHTML = `<li class="tiny" style="justify-content:center">No cheers yet. Be the first!</li>`; return; }
+    const first = feedSeen.size === 0;
+    ul.innerHTML = items.map((c) => {
+      const who = c.name || 'Someone';
+      const body = c.kind === 'msg' ? esc(c.text) : `sent ${esc(c.emoji)}${c.count > 1 ? `×${c.count}` : ''}`;
+      const isNew = !first && !feedSeen.has(c.id);
+      return `<li class="${isNew ? 'new' : ''}"><span class="av">${esc(who.slice(0, 1).toUpperCase())}</span><div class="grow"><span class="who">${esc(who)}</span> ${body}</div><span class="when" data-t="${esc(c.created_at)}">${shortAgo(c.created_at)}</span></li>`;
+    }).join('');
+    items.forEach((c) => feedSeen.add(c.id));
+  }
+
+  function tick() {
+    if (!S) return;
+    const rn = S.rider || 'Joe';
+    if ((S.status === 'not_started' || S.status === 'setup') && S.plannedStart && $('#cd')) {
+      const sec = (Date.parse(S.plannedStart) - now()) / 1000;
+      if (sec > 0) { $('#cdLabel').textContent = 'Starts In'; $('#cd').textContent = countdown(sec); }
+      else { $('#cdLabel').textContent = 'Waiting to Roll Out'; $('#cd').textContent = 'Any Minute'; }
+    }
+    if (S.status === 'live' && S.startedAt) $('#sElapsed').textContent = dur((now() - Date.parse(S.startedAt)) / 1000);
+    else if (S.status === 'finished' && S.startedAt && S.finishedAt) $('#sElapsed').textContent = dur((Date.parse(S.finishedAt) - Date.parse(S.startedAt)) / 1000);
+    else $('#sElapsed').textContent = '—';
+    // last seen
+    const dotEl = $('#seenDot'), txt = $('#seenTxt'), zone = $('#zoneSlot');
+    if (failCount >= 2) return;
+    if (S.status === 'finished') { dotEl.className = 'dot ok'; txt.textContent = `Finished at ${clock(S.finishedAt)}. Live location is off.`; zone.innerHTML = ''; }
+    else if (!S.lastSeen) {
+      dotEl.className = 'dot'; zone.innerHTML = '';
+      txt.textContent = S.status === 'live' ? 'Waiting for the first GPS point…' : 'Location shows up near the start time.';
+    } else {
+      const s = (now() - Date.parse(S.lastSeen)) / 1000;
+      dotEl.className = 'dot ' + (s < 90 ? 'ok' : s < 180 ? 'warn' : 'bad');
+      txt.textContent = `Last Seen ${ago(S.lastSeen)}`;
+      zone.innerHTML = s >= 180 && S.status === 'live' ? `<div class="zone">Probably in a dead zone. Points will catch up.</div>` : '';
+    }
+    for (const w of document.querySelectorAll('#feed .when')) w.textContent = shortAgo(w.dataset.t);
+    const left = Math.ceil((msgCooldownUntil - Date.now()) / 1000);
+    const sb = $('#sendBtn');
+    if (left > 0) { sb.disabled = true; sb.textContent = `${left}s`; } else if (sb.disabled && sb.textContent !== 'Send' && !sb.dataset.busy) { sb.disabled = false; sb.textContent = 'Send'; }
+  }
+  setInterval(tick, 1000);
+
+  // ----- name -----
+  function updateName() { $('#asName').innerHTML = name ? `Sending as <b>${esc(name)}</b> · <a href="#" id="chgName" style="color:var(--accent)">Change</a>` : ''; const c = $('#chgName'); if (c) c.onclick = (e) => { e.preventDefault(); askName(); }; }
+  function askName() {
+    return new Promise((resolve) => {
+      const sc = document.createElement('div'); sc.className = 'scrim';
+      sc.innerHTML = `<div class="card sheet"><h3>What’s Your Name?</h3><p class="sub" style="margin-top:0">So ${esc(S?.rider || 'Joe')} knows who’s cheering. Saved on this phone.</p>
+        <input class="field" id="nameIn" maxlength="24" placeholder="Your name" autocomplete="given-name" value="${esc(name)}">
+        <div class="row" style="margin-top:12px"><button class="btn grow" id="nCancel">Cancel</button><button class="btn primary grow" id="nSave">Save</button></div></div>`;
+      document.body.appendChild(sc);
+      const inp = $('#nameIn', sc); setTimeout(() => inp.focus(), 50);
+      const done = (v) => { sc.remove(); updateName(); resolve(v); };
+      $('#nCancel', sc).onclick = () => done(null);
+      const save = () => { const v = inp.value.trim().slice(0, 24); if (!v) { inp.focus(); return; } name = v; store.set('ba_name', v); done(v); };
+      $('#nSave', sc).onclick = save; inp.onkeydown = (e) => { if (e.key === 'Enter') save(); };
+    });
+  }
+  updateName();
+
+  async function post(body) {
+    const r = await fetch('/api/cheer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ k: key, v: APP_VERSION, device: deviceId(), name, ...body }) });
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 409) { showUpdate(); throw new Error('A new version is ready. Tap reload.'); }
+    if (!r.ok) { const e = new Error(j.error || 'Could not send'); e.wait = j.wait; e.status = r.status; throw e; }
+    return j;
+  }
+
+  // ----- quick taps (batched) -----
+  document.querySelectorAll('.qbtn').forEach((b) => {
+    b.onclick = async () => {
+      if (!name) { const n = await askName(); if (!n) return; }
+      const e = b.dataset.e;
+      pendingTaps[e] = (pendingTaps[e] || 0) + 1; localBump[e] = (localBump[e] || 0) + 1;
+      b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop');
+      if (navigator.vibrate) navigator.vibrate(10);
+      const n = (S?.totals?.[e] || 0) + localBump[e]; b.querySelector('.c').textContent = n;
+      clearTimeout(tapTimer); tapTimer = setTimeout(flushTaps, 1300);
+    };
+  });
+  async function flushTaps() {
+    const batch = pendingTaps; pendingTaps = {};
+    for (const [emoji, count] of Object.entries(batch)) {
+      let left = count;
+      while (left > 0) {
+        const c = Math.min(10, left);
+        try { await post({ kind: 'quick', emoji, count: c }); left -= c; }
+        catch (err) {
+          if (err.status === 429) { await new Promise((r) => setTimeout(r, 1700)); continue; }
+          localBump[emoji] = Math.max(0, (localBump[emoji] || 0) - left); toast(err.message); left = 0;
+        }
+        if (left > 0) await new Promise((r) => setTimeout(r, 1600));
+      }
+    }
+    const fresh = await fetch(`/api/state?k=${encodeURIComponent(key)}&since=${lastId}&epoch=${epoch}`, { cache: 'no-store' }).then((r) => r.json()).catch(() => null);
+    if (fresh && fresh.epoch === epoch) { for (const p of fresh.points || []) { trail.push([p[1], p[2]]); lastId = Math.max(lastId, p[0]); } localBump = {}; S = fresh; render(); }
+  }
+
+  // ----- messages -----
+  const msgIn = $('#msg');
+  msgIn.oninput = () => { $('#msgCount').textContent = `${msgIn.value.length}/140`; };
+  msgIn.onkeydown = (e) => { if (e.key === 'Enter') sendMsg(); };
+  $('#sendBtn').onclick = sendMsg;
+  async function sendMsg() {
+    const text = msgIn.value.trim();
+    if (!text) { msgIn.focus(); return; }
+    if (Date.now() < msgCooldownUntil) return;
+    if (!name) { const n = await askName(); if (!n) return; }
+    const sb = $('#sendBtn'); sb.disabled = true; sb.dataset.busy = '1'; sb.textContent = '…';
+    try {
+      await post({ kind: 'msg', text });
+      msgIn.value = ''; $('#msgCount').textContent = '0/140';
+      msgCooldownUntil = Date.now() + 20000;
+      toast(`Sent to ${S?.rider || 'Joe'} ✓`);
+      poll();
+    } catch (err) {
+      if (err.wait) msgCooldownUntil = Date.now() + err.wait * 1000;
+      toast(err.message);
+    } finally {
+      delete sb.dataset.busy;
+      if (Date.now() >= msgCooldownUntil) { sb.disabled = false; sb.textContent = 'Send'; }
+    }
+  }
+
+  poll();
+}
+
+// =====================================================================
+// ADMIN
+// =====================================================================
+function Admin() {
+  let pass = store.get('ba_admin') || '';
+  let D = null, timer = null, pendingCourse = null, pmap = null, pLayer = null, formLoaded = false;
+
+  if (!pass) return login();
+  shell(); load();
+
+  function login(err) {
+    $('#app').innerHTML = `<div class="wrap"><div class="top"><div class="brand"><img src="/icons/icon-192.png" alt=""><div><div class="t1">Breakaway</div><div class="t2">Admin</div></div></div></div>
+      <div class="card"><h3>Enter Passcode</h3><p class="sub" style="margin-top:0">Saved on this device after the first time.</p>
+      <input class="field" id="pw" type="password" autocomplete="current-password" placeholder="Passcode">
+      ${err ? `<p class="tiny" style="color:var(--bad)">${esc(err)}</p>` : ''}
+      <button class="btn primary block" id="go" style="margin-top:12px">Unlock</button></div></div>`;
+    const go = () => { const v = $('#pw').value.trim(); if (!v) return; pass = v; store.set('ba_admin', v); shell(); load(); };
+    $('#go').onclick = go; $('#pw').onkeydown = (e) => { if (e.key === 'Enter') go(); };
+    setTimeout(() => $('#pw').focus(), 50);
+  }
+
+  async function api(method, body) {
+    const r = await fetch('/api/admin', { method, cache: 'no-store', headers: { 'Content-Type': 'application/json', 'x-admin-pass': pass }, body: body ? JSON.stringify({ v: APP_VERSION, ...body }) : undefined });
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 401) { store.del('ba_admin'); pass = ''; clearTimeout(timer); login('Wrong passcode. Try again.'); throw new Error('auth'); }
+    if (r.status === 409) { showUpdate(); throw new Error('Update ready, tap reload'); }
+    if (!r.ok) throw new Error(j.error || `Error ${r.status}`);
+    return j;
+  }
+
+  function shell() {
+    $('#app').innerHTML = `<div class="wrap">
+      <div class="top"><div class="brand"><img src="/icons/icon-192.png" alt=""><div><div class="t1">Breakaway Admin</div><div class="t2" id="aName">…</div></div></div>
+        <a class="pill" id="openLive" href="#" style="color:var(--accent);text-decoration:none">Live View ↗</a></div>
+      <div class="card" id="cStatus"></div>
+      <div class="card" id="cHealth"></div>
+      <div class="card" id="cWatch"></div>
+      <div class="card" id="cShare"></div>
+      <div class="card" id="cSetup"></div>
+      <div class="card" id="cOverland"></div>
+      <div class="card" id="cCheers"></div>
+      <div class="card" id="cDanger"></div>
+      <p class="tiny" style="text-align:center">${APP_VERSION} · <a href="#" id="logout" style="color:var(--ink3)">Lock This Device</a></p>
+    </div>`;
+    $('#logout').onclick = (e) => { e.preventDefault(); store.del('ba_admin'); location.reload(); };
+  }
+
+  async function load() {
+    clearTimeout(timer);
+    try {
+      D = await api('GET');
+      skew = Date.parse(D.now) - Date.now();
+      if (D.v !== APP_VERSION) showUpdate();
+      render();
+    } catch (e) { if (e.message !== 'auth') toast(e.message); }
+    if (pass) timer = setTimeout(load, document.hidden ? 60000 : 8000);
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && pass && D) load(); });
+
+  // two-tap confirm buttons
+  function armed(btn, label, fn) {
+    btn.onclick = async () => {
+      if (!btn.dataset.armed) {
+        btn.dataset.armed = '1'; const old = btn.textContent; btn.dataset.old = old; btn.textContent = label; btn.classList.add('confirm');
+        setTimeout(() => { if (btn.dataset.armed) { delete btn.dataset.armed; btn.textContent = old; btn.classList.remove('confirm'); } }, 3500);
+        return;
+      }
+      delete btn.dataset.armed; btn.classList.remove('confirm'); btn.textContent = btn.dataset.old;
+      await fn();
+    };
+  }
+  async function act(body, okMsg) {
+    try { await api('POST', body); if (okMsg) toast(okMsg); await load(); }
+    catch (e) { if (e.message !== 'auth') toast(e.message, 3500); }
+  }
+
+  function render() {
+    const R = D.race, H = D.health, rn = R.rider_name || 'Joe';
+    $('#aName').textContent = R.name;
+    $('#openLive').href = D.share || '#';
+
+    // ---- status ----
+    const st = R.status;
+    const stLabel = st === 'live' ? '<span class="dot live"></span>Live' : st === 'finished' ? '<span class="dot ok"></span>Finished' : '<span class="dot"></span>Not Started';
+    const el = R.started_at ? ((st === 'finished' && R.finished_at ? Date.parse(R.finished_at) : now()) - Date.parse(R.started_at)) / 1000 : null;
+    $('#cStatus').innerHTML = `<h2>Race Status</h2><div class="statusbig">${stLabel}</div>
+      <div class="kv"><span class="k">Planned Start</span><span class="v num">${R.planned_start ? `${clock(R.planned_start)} · ${dayLabel(R.planned_start)}` : 'Not set'}</span></div>
+      ${R.started_at ? `<div class="kv"><span class="k">Started</span><span class="v num">${clock(R.started_at)}</span></div>` : ''}
+      ${R.finished_at ? `<div class="kv"><span class="k">Finished</span><span class="v num">${clock(R.finished_at)}</span></div>` : ''}
+      ${el != null ? `<div class="kv"><span class="k">${st === 'finished' ? 'Finish Time' : 'Elapsed'}</span><span class="v num" id="aElapsed">${dur(el)}</span></div>` : ''}
+      ${R.cur_prog_m != null && R.course_miles ? `<div class="kv"><span class="k">On Course</span><span class="v num">${(R.cur_prog_m / MI).toFixed(1)} of ${R.course_miles.toFixed(1)} mi</span></div>` : ''}
+      <div class="btngrid">
+        ${st !== 'live' ? `<button class="btn ok" id="bStart">Start Race</button>` : `<button class="btn danger" id="bEnd">End Race</button>`}
+        ${st === 'finished' ? `<button class="btn" id="bReopen">Reopen Race</button>` : `<button class="btn" id="bNS" ${st === 'not_started' ? 'disabled' : ''}>Set Not Started</button>`}
+      </div>
+      <p class="tiny" style="margin-top:10px">Start and finish are auto-detected (rolls 0.25 mi down the course after the planned start / gets within 100 m of the finish). These buttons override.</p>`;
+    if ($('#bStart')) armed($('#bStart'), 'Tap Again to Start', () => act({ action: 'start' }, 'Race is live'));
+    if ($('#bEnd')) armed($('#bEnd'), 'Tap Again to End', () => act({ action: 'end' }, 'Race ended'));
+    if ($('#bReopen')) armed($('#bReopen'), 'Tap Again to Reopen', () => act({ action: 'reopen' }, 'Reopened'));
+    if ($('#bNS')) armed($('#bNS'), 'Tap Again to Confirm', () => act({ action: 'not_started' }, 'Set to Not Started'));
+
+    // ---- health ----
+    const ing = H.lastIngestAt ? (now() - Date.parse(H.lastIngestAt)) / 1000 : null;
+    const ingCls = ing == null ? '' : ing < 150 ? 'ok' : ing < 600 ? 'warn' : 'bad';
+    const ingTxt = ing == null ? 'Never Heard From It' : ing < 150 ? 'Reaching Server' : 'Quiet';
+    const lp = H.lastPoint;
+    const chk = (ok, label) => `<span class="chk"><span class="dot ${ok ? 'ok' : 'bad'}"></span>${label}</span>`;
+    $('#cHealth').innerHTML = `<h2>Health Check</h2>
+      <div class="statusbig" style="font-size:19px"><span class="dot ${ingCls}"></span>Overland: ${ingTxt}</div>
+      <div class="kv"><span class="k">Last Heard From Phone</span><span class="v num" data-ago="${esc(H.lastIngestAt || '')}">${ago(H.lastIngestAt)}</span></div>
+      <div class="kv"><span class="k">Last Batch</span><span class="v num">${H.lastIngestCount != null ? `${H.lastIngestCount} pts · ${H.lastIngestStored ?? 0} stored` : '—'}</span></div>
+      ${H.note ? `<div class="kv"><span class="k">Note</span><span class="v" style="color:var(--warn)">${esc(H.note)}</span></div>` : ''}
+      <div class="kv"><span class="k">Last Point Stored</span><span class="v num">${lp ? `${ago(lp.received_at)}${lp.bad ? ' · filtered' : ''}` : '—'}</span></div>
+      ${lp ? `<div class="kv"><span class="k">GPS Delay</span><span class="v num">${Math.max(0, Math.round((Date.parse(lp.received_at) - Date.parse(lp.ts)) / 1000))}s</span></div>` : ''}
+      ${lp && lp.off_m != null ? `<div class="kv"><span class="k">Distance From Course</span><span class="v num">${Math.round(lp.off_m)} m</span></div>` : ''}
+      <div class="kv"><span class="k">Phone Battery</span><span class="v num">${H.battery != null ? `${Math.round(H.battery)}%${H.batteryState ? ' · ' + esc(H.batteryState) : ''}` : '—'}</span></div>
+      <div class="kv"><span class="k">Points Stored</span><span class="v num">${H.pointCount.toLocaleString()}${H.badCount ? ` (${H.badCount} bad fixes ignored)` : ''}</span></div>
+      <div class="kv"><span class="k">Batches Received</span><span class="v num">${Number(H.ingestTotal || 0).toLocaleString()}</span></div>
+      <div style="margin-top:10px">${chk(D.config.trackToken, 'Track Token')}${chk(D.config.viewKey, 'View Key')}${chk(D.config.ntfyTopic, 'ntfy Topic')}${chk(!!R.course_miles, 'Course')}${chk(!!R.planned_start, 'Start Time')}</div>
+      <button class="btn block" id="bRefresh" style="margin-top:10px">Refresh Now</button>`;
+    $('#bRefresh').onclick = () => { load(); toast('Refreshed'); };
+
+    // ---- watch ----
+    $('#cWatch').innerHTML = `<h2>Cheers to Watch</h2>
+      <div class="toggle"><div><div style="font-weight:650">Mute Cheers to Watch</div><div class="tiny">Cheers still save and show on the page.</div></div>
+        <label class="sw"><input type="checkbox" id="mute" ${R.mute ? 'checked' : ''}><span></span></label></div>
+      <button class="btn block" id="bTest" style="margin-top:10px">Send Test Push</button>
+      ${D.ntfyTopic ? `<label class="lbl">ntfy Topic (subscribe to this in the ntfy app)</label><div class="copyrow"><code>${esc(D.ntfyTopic)}</code><button class="btn" data-copy="${esc(D.ntfyTopic)}">Copy</button></div>` : ''}
+      <p class="tiny" style="margin-top:10px">At most one push every 2 min. Messages get bundled; emoji taps only get counted (a taps-only push goes out at most every 5 min).</p>`;
+    $('#mute').onchange = (e) => act({ action: 'mute', on: e.target.checked }, e.target.checked ? 'Muted' : 'Unmuted');
+    $('#bTest').onclick = () => act({ action: 'test_push' }, 'Test push sent');
+
+    // ---- share ----
+    $('#cShare').innerHTML = `<h2>Share</h2>
+      ${D.share ? `<div class="copyrow"><code>${esc(D.share)}</code></div>
+      <div class="btngrid"><button class="btn primary" data-copy="${esc(D.share)}">Copy Share Link</button><a class="btn" href="${esc(D.share)}">Open Live View</a></div>` : `<p class="sub">Set BREAKAWAY_VIEW_KEY in Vercel first.</p>`}`;
+
+    // ---- setup (render once so typing isn't wiped by refresh) ----
+    if (!formLoaded) { renderSetup(); formLoaded = true; }
+
+    // ---- overland ----
+    const O = D.overland;
+    $('#cOverland').innerHTML = `<h2>Overland Setup</h2>
+      <a class="btn primary block" href="${esc(O.setupLink)}">Set Up Overland Automatically</a>
+      <p class="tiny" style="margin-top:6px">Opens Overland with the URL and token filled in. Or paste them by hand:</p>
+      <label class="lbl">Receiver Endpoint URL</label><div class="copyrow"><code>${esc(O.url)}</code><button class="btn" data-copy="${esc(O.url)}">Copy</button></div>
+      <label class="lbl">Access Token</label><div class="copyrow"><code>${O.token ? esc(O.token) : 'BREAKAWAY_TRACK_TOKEN not set'}</code>${O.token ? `<button class="btn" data-copy="${esc(O.token)}">Copy</button>` : ''}</div>
+      <label class="lbl">Recommended Settings</label>
+      <ol class="tips">
+        <li>iPhone Settings → Overland → Location: <b>Always</b>, Precise <b>On</b></li>
+        <li>Tracking Enabled: <b>On</b></li>
+        <li>Desired Accuracy: <b>Best</b> · Activity Type: <b>Fitness</b></li>
+        <li>Pause Updates Automatically: <b>Off</b> (most important)</li>
+        <li>Continuous Tracking Mode: <b>Standard</b> · Visit Tracking: <b>Off</b></li>
+        <li>Logging Mode: <b>All Data</b> · Locations per Batch: <b>50</b></li>
+        <li>Min Time Between Points: <b>5s</b> · Min Distance: <b>Off</b></li>
+        <li>Resume with Geofence: <b>Off</b></li>
+        <li>On the tracker screen, Send Interval: <b>30s</b> (60s if battery is a worry)</li>
+      </ol>`;
+
+    // ---- cheers list ----
+    const cs = D.cheers || [];
+    $('#cCheers').innerHTML = `<h2>Cheers (${cs.length})</h2>${cs.length ? `<ul class="feed" style="max-height:420px">${cs.map((c) => `
+      <li><div class="grow ${c.hidden ? 'hid' : ''}"><span class="who">${esc(c.name || 'Someone')}</span> ${c.kind === 'msg' ? esc(c.text) : `${esc(c.emoji)}×${c.count}`}
+      <div class="tiny">${shortAgo(c.created_at)} ago${c.pushed ? ' · pushed' : ''}${c.hidden ? ' · hidden' : ''}</div></div>
+      ${c.kind === 'msg' ? `<button class="btn" style="min-height:36px;font-size:13px" data-hide="${c.id}" data-h="${c.hidden ? 0 : 1}">${c.hidden ? 'Unhide' : 'Hide'}</button>` : ''}</li>`).join('')}</ul>` : '<p class="sub">No cheers yet.</p>'}`;
+    document.querySelectorAll('[data-hide]').forEach((b) => b.onclick = () => act({ action: 'hide', id: Number(b.dataset.hide), hidden: b.dataset.h === '1' }, b.dataset.h === '1' ? 'Hidden' : 'Unhidden'));
+
+    // ---- danger ----
+    $('#cDanger').innerHTML = `<h2>Test Data</h2><p class="sub" style="margin-top:0">After a test ride, clear it so race day starts clean. Deletes all points and cheers and sets the race to Not Started. Setup and course stay.</p>
+      <button class="btn danger block" id="bClear">Clear Test Data</button>`;
+    armed($('#bClear'), 'Tap Again to Delete Everything', () => act({ action: 'clear_data' }, 'Cleared'));
+
+    document.querySelectorAll('[data-copy]').forEach((b) => b.onclick = () => copy(b.dataset.copy));
+  }
+  setInterval(() => {
+    if (!D) return;
+    const R = D.race, e = $('#aElapsed');
+    if (e && R.started_at && R.status === 'live') e.textContent = dur((now() - Date.parse(R.started_at)) / 1000);
+    document.querySelectorAll('[data-ago]').forEach((x) => { if (x.dataset.ago) x.textContent = ago(x.dataset.ago); });
+  }, 1000);
+
+  function toLocalInput(iso) {
+    if (!iso) return '';
+    const d = new Date(iso); const p = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+
+  function renderSetup() {
+    const R = D.race;
+    $('#cSetup').innerHTML = `<h2>Race Setup</h2>
+      <label class="lbl">Race Name</label><input class="field" id="fName" maxlength="60" value="${esc(R.name)}">
+      <label class="lbl">Rider Name (shown to followers)</label><input class="field" id="fRider" maxlength="24" value="${esc(R.rider_name || 'Joe')}">
+      <label class="lbl">Race Date</label><input class="field" id="fDate" type="date" value="${esc(R.race_date || '')}">
+      <label class="lbl">Planned Start (your wave)</label><input class="field" id="fStart" type="datetime-local" value="${toLocalInput(R.planned_start)}">
+      <label class="lbl">Max Speed Filter (mph)</label><input class="field" id="fMax" type="number" inputmode="numeric" min="10" max="150" value="${esc(R.max_mph ?? 40)}">
+      <p class="tiny" style="margin-top:4px">GPS jumps faster than this get ignored. Keep 40 for the race. Set 90 for a car test.</p>
+      <label class="lbl">Course (GPX)</label>
+      <div class="sub" id="courseInfo">${R.course_miles ? `${esc(R.course_name || 'course.gpx')} · <b class="num">${R.course_miles.toFixed(2)} mi</b>` : 'No course uploaded yet.'}</div>
+      <label class="btn block" style="margin-top:8px">Upload GPX<input type="file" id="fGpx" class="hidden"></label>
+      <div class="pmapwrap"><div id="pmap"></div></div>
+      <button class="btn primary block" id="bSave" style="margin-top:12px">Save Setup</button>`;
+    pmap = L.map('pmap', { zoomControl: false, attributionControl: true, dragging: true }).setView([44.73, -85.37], 10);
+    pmap.attributionControl.setPrefix(false);
+    tiles().map.addTo(pmap); pLayer = L.layerGroup().addTo(pmap);
+    if (D.share) {
+      const k = new URL(D.share).searchParams.get('k');
+      fetch(`/api/state?k=${encodeURIComponent(k)}&part=course`, { cache: 'no-store' }).then((r) => r.json()).then((j) => {
+        if (pendingCourse || !j.course) return;
+        const b = drawCourse(pmap, j.course.pts, pLayer); if (b) pmap.fitBounds(b, { padding: [16, 16] });
+      }).catch(() => {});
+    }
+    $('#fGpx').onchange = async (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      try {
+        const text = await f.text();
+        const c = parseGpx(text);
+        pendingCourse = { ...c, name: f.name };
+        $('#courseInfo').innerHTML = `New: ${esc(f.name)} · <b class="num">${(c.total_m / MI).toFixed(2)} mi</b> · ${c.raw.toLocaleString()} → ${c.pts.length.toLocaleString()} points <span style="color:var(--warn)">(not saved yet)</span>`;
+        const b = drawCourse(pmap, c.pts, pLayer); if (b) pmap.fitBounds(b, { padding: [16, 16] });
+      } catch (err) { toast(err.message, 3500); }
+      e.target.value = '';
+    };
+    $('#bSave').onclick = async () => {
+      const body = {
+        action: 'save', name: $('#fName').value, rider: $('#fRider').value, raceDate: $('#fDate').value,
+        plannedStart: $('#fStart').value ? new Date($('#fStart').value).toISOString() : null,
+        maxMph: Number($('#fMax').value) || 40
+      };
+      if (pendingCourse) { body.course = { pts: pendingCourse.pts }; body.courseName = pendingCourse.name; }
+      const btn = $('#bSave'); btn.disabled = true; btn.textContent = 'Saving…';
+      try {
+        await api('POST', body); toast('Setup saved');
+        if (pendingCourse) $('#courseInfo').innerHTML = `${esc(pendingCourse.name)} · <b class="num">${(pendingCourse.total_m / MI).toFixed(2)} mi</b> · saved`;
+        pendingCourse = null; await load();
+      } catch (e) { if (e.message !== 'auth') toast(e.message, 3500); }
+      btn.disabled = false; btn.textContent = 'Save Setup';
+    };
+  }
+}
+
+// ---------- GPX ----------
+function hav(a, b, c, d) {
+  const R = 6371008.8, t = Math.PI / 180, dLat = (c - a) * t, dLon = (d - b) * t;
+  const x = Math.sin(dLat / 2) ** 2 + Math.cos(a * t) * Math.cos(c * t) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(x)));
+}
+function parseGpx(text) {
+  const doc = new DOMParser().parseFromString(text, 'application/xml');
+  if (doc.getElementsByTagName('parsererror').length) throw new Error('That file isn’t a valid GPX');
+  let nodes = [...doc.getElementsByTagNameNS('*', 'trkpt')];
+  if (nodes.length < 2) nodes = [...doc.getElementsByTagNameNS('*', 'rtept')];
+  const raw = [];
+  for (const n of nodes) {
+    const lat = parseFloat(n.getAttribute('lat')), lon = parseFloat(n.getAttribute('lon'));
+    if (!isFinite(lat) || !isFinite(lon)) continue;
+    const e = n.getElementsByTagNameNS('*', 'ele')[0]; const ele = e ? parseFloat(e.textContent) : null;
+    const last = raw[raw.length - 1];
+    if (last && last[0] === lat && last[1] === lon) continue;
+    raw.push([lat, lon, isFinite(ele) ? ele : null]);
+  }
+  if (raw.length < 2) throw new Error('No track points found in that GPX');
+  // cumulative distance on the full-resolution line
+  const cum = [0];
+  for (let i = 1; i < raw.length; i++) cum.push(cum[i - 1] + hav(raw[i - 1][0], raw[i - 1][1], raw[i][0], raw[i][1]));
+  // simplify (Douglas-Peucker in local meters), keep ≤ 4000 points
+  const lat0 = raw[0][0], kx = Math.cos(lat0 * Math.PI / 180) * 111320, ky = 110540;
+  const xy = raw.map((p) => [(p[1] - raw[0][1]) * kx, (p[0] - lat0) * ky]);
+  let tol = 3, keep;
+  do { keep = dp(xy, tol); tol *= 1.6; } while (keep.length > 4000);
+  const pts = keep.map((i) => [raw[i][0], raw[i][1], Math.round(cum[i] * 10) / 10, raw[i][2] != null ? Math.round(raw[i][2] * 10) / 10 : null]);
+  return { pts, total_m: cum[cum.length - 1], raw: raw.length };
+}
+function dp(xy, tol) {
+  const n = xy.length, keep = new Uint8Array(n); keep[0] = keep[n - 1] = 1;
+  const stack = [[0, n - 1]];
+  while (stack.length) {
+    const [a, b] = stack.pop(); let max = 0, idx = -1;
+    const [ax, ay] = xy[a], [bx, by] = xy[b], dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy;
+    for (let i = a + 1; i < b; i++) {
+      const [px, py] = xy[i];
+      let t = L2 ? ((px - ax) * dx + (py - ay) * dy) / L2 : 0; t = Math.max(0, Math.min(1, t));
+      const ex = ax + t * dx - px, ey = ay + t * dy - py, d = ex * ex + ey * ey;
+      if (d > max) { max = d; idx = i; }
+    }
+    if (idx > 0 && max > tol * tol) { keep[idx] = 1; stack.push([a, idx], [idx, b]); }
+  }
+  const out = []; for (let i = 0; i < n; i++) if (keep[i]) out.push(i); return out;
+}
+
+// version check every 5 min (catches deploys while the page is open)
+setInterval(() => { fetch('/version.json', { cache: 'no-store' }).then((r) => r.json()).then((j) => { if (j.version && j.version !== APP_VERSION) showUpdate(); }).catch(() => {}); }, 300000);
+
+route();
+</script>
+</body>
+</html>
