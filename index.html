@@ -98,6 +98,10 @@ label.lbl{display:block;font-size:13px;color:var(--ink2);margin:var(--s3) 0 6px;
 .mapbtn{min-height:36px;padding:0 12px;border-radius:var(--r4);border:1px solid var(--stroke2);background:rgba(10,18,30,.72);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);
   color:var(--ink);font-size:13px;font-weight:600;box-shadow:var(--spec),0 4px 14px rgba(0,0,0,.35)}
 .mapbtn.on{color:#04131d;background:linear-gradient(180deg,#9fe2ff,#5cc4f2)}
+.recenter{position:absolute;right:10px;bottom:26px;z-index:500;width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  border:1px solid var(--stroke2);background:rgba(10,18,30,.78);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);color:var(--ink);box-shadow:var(--spec),0 4px 14px rgba(0,0,0,.4)}
+.recenter.on{color:var(--accent)}
+.recenter:active{transform:scale(.94)}
 .rider{position:relative}
 .rider .core{position:absolute;left:-9px;top:-9px;width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid var(--accent);box-shadow:0 0 14px rgba(127,214,255,.9)}
 .rider .ring{position:absolute;left:-9px;top:-9px;width:18px;height:18px;border-radius:50%;border:2px solid var(--accent);animation:ring 2s ease-out infinite}
@@ -134,6 +138,12 @@ label.lbl{display:block;font-size:13px;color:var(--ink2);margin:var(--s3) 0 6px;
 @keyframes pop{40%{transform:scale(1.14)}}
 .msgbox{display:flex;gap:var(--s2);align-items:stretch}
 .msgbox .btn{flex:none;min-width:76px}
+.msgbox .btn.mic{min-width:48px;padding:0 10px;font-size:20px}
+.voicebox{margin-top:var(--s2);padding:var(--s3);border-radius:var(--r2);background:rgba(0,0,0,.25);border:1px solid var(--stroke)}
+.voicebox .rec{display:flex;align-items:center;gap:10px;font-weight:650}
+.recdot{width:12px;height:12px;border-radius:50%;background:var(--bad);animation:livepulse 1.2s infinite}
+.vbar{height:6px;border-radius:99px;background:rgba(255,255,255,.1);overflow:hidden;margin:10px 0}
+.vbar i{display:block;height:100%;width:0;background:var(--bad);transition:width .25s linear}
 .feed{list-style:none;margin:var(--s3) 0 0;padding:0;max-height:360px;overflow:auto;-webkit-overflow-scrolling:touch}
 .feed li{display:flex;gap:10px;padding:10px 2px;border-top:1px solid rgba(255,255,255,.06);font-size:15px;line-height:1.35}
 .feed li:first-child{border-top:0}
@@ -168,6 +178,10 @@ label.lbl{display:block;font-size:13px;color:var(--ink2);margin:var(--s3) 0 6px;
 .sw span{position:absolute;inset:0;border-radius:99px;background:rgba(255,255,255,.16);border:1px solid var(--stroke2);transition:.2s}
 .sw span::after{content:"";position:absolute;left:3px;top:3px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.4);transition:.2s}
 .sw input:checked+span{background:var(--warn)}
+.sw.ok input:checked+span{background:var(--ok)}
+.btn.big{min-height:58px;font-size:18px;border-radius:var(--r2)}
+.rmfeed{max-height:none}
+.rmtext{font-size:19px;line-height:1.35;margin-top:3px;font-weight:550}
 .sw input:checked+span::after{transform:translateX(20px)}
 .pmapwrap{position:relative;height:220px;border-radius:var(--r2);overflow:hidden;margin-top:var(--s3);border:1px solid var(--stroke)}
 ol.tips{margin:var(--s2) 0 0;padding-left:20px;color:var(--ink2);font-size:14px;line-height:1.55}
@@ -180,7 +194,7 @@ ol.tips b{color:var(--ink)}
 <script src="/vendor/leaflet.js"></script>
 <script>
 'use strict';
-const APP_VERSION = 'breakaway-1';
+const APP_VERSION = 'breakaway-2';
 const QUICK = ['🔥', '👏', '💪', '🚴', '❄️'];
 const MI = 1609.344;
 if (navigator.standalone || matchMedia('(display-mode: standalone)').matches) document.documentElement.classList.add('standalone');
@@ -238,12 +252,26 @@ function deviceId() {
   if (!d) { d = 'd' + Math.random().toString(36).slice(2) + Date.now().toString(36); store.set('ba_device', d); }
   return d;
 }
+// Satellite is the default (no key needed). "Map" = OpenStreetMap (no key needed).
 function tiles() {
+  const sat = L.layerGroup([
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, maxNativeZoom: 18, attribution: 'Imagery © Esri' }),
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, maxNativeZoom: 18, opacity: .85 })
+  ]);
   return {
-    map: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { subdomains: 'abcd', maxZoom: 19, attribution: '© OpenStreetMap © CARTO' }),
-    sat: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Imagery © Esri' })
+    sat,
+    map: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' })
   };
 }
+// Keep the map around the race: can't pan or zoom far away from the course.
+function lockToCourse(map, bounds) {
+  if (!bounds) return;
+  const box = bounds.pad(0.12);
+  map.setMaxBounds(box);
+  map.options.maxBoundsViscosity = 1.0;
+  map.setMinZoom(Math.max(7, map.getBoundsZoom(box) - 1));
+}
+const RECENTER_SVG = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.7 2.3a1 1 0 0 0-1.06-.23l-18 7a1 1 0 0 0 .08 1.9l7.6 2.18 2.18 7.6a1 1 0 0 0 1.9.08l7-18a1 1 0 0 0-.23-1.06z"/></svg>';
 function flagIcon(cls) { return L.divIcon({ className: '', html: `<div class="flag ${cls}"></div>`, iconSize: [14, 14], iconAnchor: [7, 7] }); }
 function drawCourse(map, pts, layerGroup) {
   layerGroup.clearLayers();
@@ -256,12 +284,48 @@ function drawCourse(map, pts, layerGroup) {
   return L.latLngBounds(ll);
 }
 
+// ---------- sounds ----------
+let actx = null;
+function unlockChime() {
+  try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); } catch {}
+}
+// A short bell; each cheer emoji gets its own note.
+function chime(i = 0) {
+  try {
+    unlockChime(); if (!actx) return;
+    const base = [659.25, 783.99, 880, 987.77, 1174.66][((i % 5) + 5) % 5];
+    const t = actx.currentTime;
+    [[1, 0.22, 0.8], [2, 0.07, 0.45], [3.01, 0.03, 0.25]].forEach(([m, peak, len]) => {
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = 'sine'; o.frequency.value = base * m;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(peak, t + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+      o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + len + 0.05);
+    });
+  } catch {}
+}
+function blobToB64(b) {
+  return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = rej; r.readAsDataURL(b); });
+}
+// 16-bit mono WAV from a sample function (used for Race Mode's keep-alive + chime, no files needed).
+function makeWav(seconds, rate, fn) {
+  const n = Math.floor(seconds * rate), buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+  const w = (o, str) => { for (let i = 0; i < str.length; i++) v.setUint8(o + i, str.charCodeAt(i)); };
+  w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true);
+  v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, Math.max(-32767, Math.min(32767, Math.round(fn(i / rate) * 32767))), true);
+  return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+}
+
 // ---------- routing ----------
 const params = new URLSearchParams(location.search);
 const urlKey = params.get('k');
 if (urlKey) store.set('ba_view', urlKey);
 function route() {
   const wantAdmin = location.hash === '#admin' || location.pathname === '/admin';
+  if (location.hash === '#race') return RaceMode();
   if (urlKey && !wantAdmin) return Live(urlKey);
   if (wantAdmin) return Admin();
   if (store.get('ba_admin')) return Admin();
@@ -292,7 +356,8 @@ function Live(key) {
     </div>
     <div id="heroSlot"></div>
     <div class="card mapcard"><div id="map"></div>
-      <div class="mapbtns"><button class="mapbtn hidden" id="followBtn">Follow</button><button class="mapbtn" id="layerBtn">Satellite</button></div>
+      <div class="mapbtns"><button class="mapbtn" id="layerBtn">Map</button></div>
+      <button class="recenter on" id="recBtn" aria-label="Recenter Map">${RECENTER_SVG}</button>
     </div>
     <div class="card" style="padding:0" id="statsCard">
       <div class="stats">
@@ -308,10 +373,12 @@ function Live(key) {
     </div>
     <div class="card" id="cheerCard">
       <h3 id="cheerTitle">Send a Cheer</h3>
-      <div class="sub">Pops up on his Apple Watch mid-race. Tap as many as you want.</div>
+      <div class="sub">Taps and messages pop up on his Apple Watch. Voice messages play out loud on his phone.</div>
       <div class="quick">${QUICK.map((e) => `<button class="qbtn" data-e="${e}" aria-label="Cheer ${e}"><span>${e}</span><span class="c num">0</span></button>`).join('')}</div>
-      <div class="msgbox"><input class="field grow" id="msg" maxlength="140" placeholder="Write a message…" enterkeyhint="send" autocomplete="off"><button class="btn primary" id="sendBtn">Send</button></div>
+      <div class="msgbox"><input class="field grow" id="msg" maxlength="140" placeholder="Write a message…" enterkeyhint="send" autocomplete="off"><button class="btn mic" id="micBtn" aria-label="Record Voice Message">🎙️</button><button class="btn primary" id="sendBtn">Send</button></div>
+      <div class="voicebox hidden" id="voiceBox"></div>
       <div class="row" style="justify-content:space-between;margin-top:6px"><span class="tiny" id="asName"></span><span class="tiny num" id="msgCount">0/140</span></div>
+      <p class="tiny" style="margin:10px 0 0">🔒 Your messages are private. Only you and <span class="rn">Joe</span> see them. Emoji taps are shared with everyone.</p>
       <ul class="feed" id="feed"></ul>
     </div>
     <p class="tiny" style="text-align:center;margin-top:var(--s4)">GPS from his phone · not official timing · ${APP_VERSION}</p>
@@ -320,12 +387,18 @@ function Live(key) {
   // map
   const map = L.map('map', { zoomControl: false, attributionControl: true, tap: true }).setView([44.73, -85.37], 10);
   map.attributionControl.setPrefix(false);
-  const T = tiles(); let layer = 'map'; T.map.addTo(map);
+  const T = tiles(); let layer = 'sat'; T.sat.addTo(map);
   const courseLayer = L.layerGroup().addTo(map);
   const trailLine = L.polyline([], { color: '#7fd6ff', weight: 5, opacity: .95, lineJoin: 'round', interactive: false }).addTo(map);
   let rider = null, courseBounds = null;
-  map.on('dragstart', () => { if (S && S.cur) { follow = false; $('#followBtn').classList.remove('hidden'); } });
-  $('#followBtn').onclick = () => { follow = true; $('#followBtn').classList.add('hidden'); if (S && S.cur) map.setView([S.cur.lat, S.cur.lon], Math.max(map.getZoom(), 14)); };
+  const setFollow = (on) => { follow = on; $('#recBtn').classList.toggle('on', on); };
+  map.on('dragstart', () => setFollow(false));
+  // Recenter: back to Joe (live) or the whole course (before/after).
+  $('#recBtn').onclick = () => {
+    setFollow(true);
+    if (S && S.cur && S.status === 'live') map.setView([S.cur.lat, S.cur.lon], Math.max(map.getZoom(), 14));
+    else if (courseBounds) map.fitBounds(courseBounds, { padding: [24, 24] });
+  };
   $('#layerBtn').onclick = () => {
     map.removeLayer(T[layer]); layer = layer === 'map' ? 'sat' : 'map'; T[layer].addTo(map);
     $('#layerBtn').textContent = layer === 'map' ? 'Satellite' : 'Map';
@@ -338,12 +411,13 @@ function Live(key) {
     courseBounds = drawCourse(map, course && course.pts, courseLayer);
     trailLine.bringToFront();
     if (courseBounds && (!S || !S.cur || !follow)) { map.fitBounds(courseBounds, { padding: [24, 24] }); firstFit = true; }
+    lockToCourse(map, courseBounds);
   }
 
   async function poll() {
     if (inflight) return; inflight = true; clearTimeout(timer);
     try {
-      const r = await fetch(`/api/state?k=${encodeURIComponent(key)}&since=${lastId}&epoch=${epoch}`, { cache: 'no-store' });
+      const r = await fetch(`/api/state?k=${encodeURIComponent(key)}&since=${lastId}&epoch=${epoch}&d=${deviceId()}`, { cache: 'no-store' });
       if (r.status === 403) { badLink(); return; }
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || r.status);
@@ -440,6 +514,8 @@ function Live(key) {
       b.querySelector('.c').textContent = n > 999 ? Math.round(n / 100) / 10 + 'k' : n;
     }
     renderFeed();
+    document.querySelectorAll('.rn').forEach((x) => { x.textContent = rn; });
+    $('#micBtn').classList.toggle('hidden', S.voiceOn === false);
     tick();
   }
   let firstFitFinished = false;
@@ -451,9 +527,11 @@ function Live(key) {
     const first = feedSeen.size === 0;
     ul.innerHTML = items.map((c) => {
       const who = c.name || 'Someone';
-      const body = c.kind === 'msg' ? esc(c.text) : `sent ${esc(c.emoji)}${c.count > 1 ? `×${c.count}` : ''}`;
+      const body = c.kind === 'msg' ? esc(c.text)
+        : c.kind === 'voice' ? `🎙️ Voice message${c.audio_secs ? ` · ${Math.round(c.audio_secs)}s` : ''}`
+        : `sent ${esc(c.emoji)}${c.count > 1 ? `×${c.count}` : ''}`;
       const isNew = !first && !feedSeen.has(c.id);
-      return `<li class="${isNew ? 'new' : ''}"><span class="av">${esc(who.slice(0, 1).toUpperCase())}</span><div class="grow"><span class="who">${esc(who)}</span> ${body}</div><span class="when" data-t="${esc(c.created_at)}">${shortAgo(c.created_at)}</span></li>`;
+      return `<li class="${isNew ? 'new' : ''}"><span class="av">${esc(who.slice(0, 1).toUpperCase())}</span><div class="grow"><span class="who">${esc(who)}</span> ${body}${c.mine ? `<div class="tiny">🔒 Only you and ${esc(S.rider || 'Joe')} see this</div>` : ''}</div><span class="when" data-t="${esc(c.created_at)}">${shortAgo(c.created_at)}</span></li>`;
     }).join('');
     items.forEach((c) => feedSeen.add(c.id));
   }
@@ -518,8 +596,10 @@ function Live(key) {
   // ----- quick taps (batched) -----
   document.querySelectorAll('.qbtn').forEach((b) => {
     b.onclick = async () => {
+      unlockChime();
       if (!name) { const n = await askName(); if (!n) return; }
       const e = b.dataset.e;
+      chime(QUICK.indexOf(e));
       pendingTaps[e] = (pendingTaps[e] || 0) + 1; localBump[e] = (localBump[e] || 0) + 1;
       b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop');
       if (navigator.vibrate) navigator.vibrate(10);
@@ -541,8 +621,73 @@ function Live(key) {
         if (left > 0) await new Promise((r) => setTimeout(r, 1600));
       }
     }
-    const fresh = await fetch(`/api/state?k=${encodeURIComponent(key)}&since=${lastId}&epoch=${epoch}`, { cache: 'no-store' }).then((r) => r.json()).catch(() => null);
+    const fresh = await fetch(`/api/state?k=${encodeURIComponent(key)}&since=${lastId}&epoch=${epoch}&d=${deviceId()}`, { cache: 'no-store' }).then((r) => r.json()).catch(() => null);
     if (fresh && fresh.epoch === epoch) { for (const p of fresh.points || []) { trail.push([p[1], p[2]]); lastId = Math.max(lastId, p[0]); } localBump = {}; S = fresh; render(); }
+  }
+
+  // ----- voice messages (15 s max) -----
+  let rec = null, recChunks = [], recStart = 0, recTimer = null, recBlob = null, recSecs = 0, voiceCooldownUntil = 0;
+  const micBtn = $('#micBtn'), vbox = $('#voiceBox');
+  micBtn.onclick = async () => {
+    if (rec && rec.state === 'recording') return stopRec();
+    if (Date.now() < voiceCooldownUntil) { toast(`Wait ${Math.ceil((voiceCooldownUntil - Date.now()) / 1000)}s before the next voice message`); return; }
+    if (!name) { const n = await askName(); if (!n) return; }
+    if (!window.MediaRecorder || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { toast('Voice messages need a newer browser'); return; }
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+    catch { toast('Allow the microphone to record a voice message', 3500); return; }
+    const types = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'];
+    const want = types.find((t) => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || '';
+    try { rec = new MediaRecorder(stream, want ? { mimeType: want, audioBitsPerSecond: 64000 } : undefined); }
+    catch { rec = new MediaRecorder(stream); }
+    recChunks = [];
+    rec.ondataavailable = (e) => { if (e.data && e.data.size) recChunks.push(e.data); };
+    rec.onstop = () => {
+      stream.getTracks().forEach((t) => t.stop());
+      recSecs = Math.min(15, (Date.now() - recStart) / 1000);
+      recBlob = new Blob(recChunks, { type: (rec.mimeType || want || 'audio/mp4').split(';')[0] });
+      if (recSecs < 0.8 || recBlob.size < 800) { vbox.classList.add('hidden'); vbox.innerHTML = ''; toast('Too short. Hold on a sec longer.'); return; }
+      showPreview();
+    };
+    rec.start(250); recStart = Date.now();
+    micBtn.textContent = '■'; micBtn.classList.add('danger');
+    vbox.classList.remove('hidden');
+    vbox.innerHTML = `<div class="rec"><span class="recdot"></span><span>Recording</span><span class="num" id="recT" style="margin-left:auto">0:00 / 0:15</span></div>
+      <div class="vbar"><i id="recBar"></i></div><button class="btn danger block" id="recStop">Stop</button>`;
+    $('#recStop').onclick = stopRec;
+    recTimer = setInterval(() => {
+      const t = (Date.now() - recStart) / 1000;
+      const el = $('#recT'); if (el) el.textContent = `0:${String(Math.min(15, Math.floor(t))).padStart(2, '0')} / 0:15`;
+      const bar = $('#recBar'); if (bar) bar.style.width = Math.min(100, t / 15 * 100) + '%';
+      if (t >= 15) stopRec();
+    }, 250);
+  };
+  function stopRec() {
+    clearInterval(recTimer);
+    if (rec && rec.state === 'recording') rec.stop();
+    micBtn.textContent = '🎙️'; micBtn.classList.remove('danger');
+  }
+  function showPreview() {
+    const url = URL.createObjectURL(recBlob);
+    vbox.innerHTML = `<div class="rec">🎙️ <span>Voice message · ${Math.max(1, Math.round(recSecs))}s</span></div>
+      <audio controls src="${url}" style="width:100%;margin:10px 0"></audio>
+      <div class="row"><button class="btn grow" id="vDiscard">Discard</button><button class="btn primary grow" id="vSend">Send Voice</button></div>`;
+    $('#vDiscard').onclick = () => { vbox.classList.add('hidden'); vbox.innerHTML = ''; recBlob = null; };
+    $('#vSend').onclick = sendVoice;
+  }
+  async function sendVoice() {
+    const btn = $('#vSend'); btn.disabled = true; btn.textContent = 'Sending…';
+    try {
+      const audio = await blobToB64(recBlob);
+      await post({ kind: 'voice', audio, mime: recBlob.type, secs: recSecs });
+      vbox.classList.add('hidden'); vbox.innerHTML = ''; recBlob = null;
+      voiceCooldownUntil = Date.now() + 60000;
+      toast(`Voice message sent to ${S?.rider || 'Joe'} ✓`);
+      poll();
+    } catch (err) {
+      if (err.wait) voiceCooldownUntil = Date.now() + err.wait * 1000;
+      toast(err.message, 3500); btn.disabled = false; btn.textContent = 'Send Voice';
+    }
   }
 
   // ----- messages -----
@@ -692,18 +837,23 @@ function Admin() {
       <div class="kv"><span class="k">Phone Battery</span><span class="v num">${H.battery != null ? `${Math.round(H.battery)}%${H.batteryState ? ' · ' + esc(H.batteryState) : ''}` : '—'}</span></div>
       <div class="kv"><span class="k">Points Stored</span><span class="v num">${H.pointCount.toLocaleString()}${H.badCount ? ` (${H.badCount} bad fixes ignored)` : ''}</span></div>
       <div class="kv"><span class="k">Batches Received</span><span class="v num">${Number(H.ingestTotal || 0).toLocaleString()}</span></div>
+      <div class="kv"><span class="k">Race Mode</span><span class="v num">${H.raceModeSeenAt && now() - Date.parse(H.raceModeSeenAt) < 90000 ? '<span style="color:var(--ok)">Listening</span>' : 'Not Open'} · ${ago(H.raceModeSeenAt)}</span></div>
       <div style="margin-top:10px">${chk(D.config.trackToken, 'Track Token')}${chk(D.config.viewKey, 'View Key')}${chk(D.config.ntfyTopic, 'ntfy Topic')}${chk(!!R.course_miles, 'Course')}${chk(!!R.planned_start, 'Start Time')}</div>
       <button class="btn block" id="bRefresh" style="margin-top:10px">Refresh Now</button>`;
     $('#bRefresh').onclick = () => { load(); toast('Refreshed'); };
 
     // ---- watch ----
     $('#cWatch').innerHTML = `<h2>Cheers to Watch</h2>
+      <a class="btn primary block" href="/#race" style="margin-bottom:12px">Open Race Mode</a>
+      <div class="toggle"><div><div style="font-weight:650">Voice Messages</div><div class="tiny">Followers can send 15s clips. Race Mode plays them out loud.</div></div>
+        <label class="sw ok"><input type="checkbox" id="voiceOn" ${R.voice_on !== false ? 'checked' : ''}><span></span></label></div>
       <div class="toggle"><div><div style="font-weight:650">Mute Cheers to Watch</div><div class="tiny">Cheers still save and show on the page.</div></div>
         <label class="sw"><input type="checkbox" id="mute" ${R.mute ? 'checked' : ''}><span></span></label></div>
       <button class="btn block" id="bTest" style="margin-top:10px">Send Test Push</button>
       ${D.ntfyTopic ? `<label class="lbl">ntfy Topic (subscribe to this in the ntfy app)</label><div class="copyrow"><code>${esc(D.ntfyTopic)}</code><button class="btn" data-copy="${esc(D.ntfyTopic)}">Copy</button></div>` : ''}
-      <p class="tiny" style="margin-top:10px">At most one push every 2 min. Messages get bundled; emoji taps only get counted (a taps-only push goes out at most every 5 min).</p>`;
+      <p class="tiny" style="margin-top:10px">At most one push every 2 min. If one just went out, the next bundle is scheduled with ntfy so it still arrives on time. Emoji taps only get counted (a taps-only push goes out at most every 5 min).</p>`;
     $('#mute').onchange = (e) => act({ action: 'mute', on: e.target.checked }, e.target.checked ? 'Muted' : 'Unmuted');
+    $('#voiceOn').onchange = (e) => act({ action: 'voice', on: e.target.checked }, e.target.checked ? 'Voice messages on' : 'Voice messages off');
     $('#bTest').onclick = () => act({ action: 'test_push' }, 'Test push sent');
 
     // ---- share ----
@@ -737,10 +887,18 @@ function Admin() {
     // ---- cheers list ----
     const cs = D.cheers || [];
     $('#cCheers').innerHTML = `<h2>Cheers (${cs.length})</h2>${cs.length ? `<ul class="feed" style="max-height:420px">${cs.map((c) => `
-      <li><div class="grow ${c.hidden ? 'hid' : ''}"><span class="who">${esc(c.name || 'Someone')}</span> ${c.kind === 'msg' ? esc(c.text) : `${esc(c.emoji)}×${c.count}`}
-      <div class="tiny">${shortAgo(c.created_at)} ago${c.pushed ? ' · pushed' : ''}${c.hidden ? ' · hidden' : ''}</div></div>
-      ${c.kind === 'msg' ? `<button class="btn" style="min-height:36px;font-size:13px" data-hide="${c.id}" data-h="${c.hidden ? 0 : 1}">${c.hidden ? 'Unhide' : 'Hide'}</button>` : ''}</li>`).join('')}</ul>` : '<p class="sub">No cheers yet.</p>'}`;
+      <li><div class="grow ${c.hidden ? 'hid' : ''}"><span class="who">${esc(c.name || 'Someone')}</span> ${c.kind === 'msg' ? esc(c.text) : c.kind === 'voice' ? `🎙️ Voice${c.audio_secs ? ` (${Math.round(c.audio_secs)}s)` : ''}` : `${esc(c.emoji)}×${c.count}`}
+      <div class="tiny">${shortAgo(c.created_at)} ago${c.pushed ? ' · pushed' : ''}${c.kind === 'voice' ? (c.played_at ? ' · played' : ' · not played yet') : ''}${c.hidden ? ' · hidden' : ''}</div></div>
+      ${c.kind === 'voice' ? `<button class="btn" style="min-height:36px;font-size:13px" data-play="${c.id}">Play</button>` : ''}
+      ${c.kind !== 'quick' ? `<button class="btn" style="min-height:36px;font-size:13px" data-hide="${c.id}" data-h="${c.hidden ? 0 : 1}">${c.hidden ? 'Unhide' : 'Hide'}</button>` : ''}</li>`).join('')}</ul>` : '<p class="sub">No cheers yet.</p>'}`;
     document.querySelectorAll('[data-hide]').forEach((b) => b.onclick = () => act({ action: 'hide', id: Number(b.dataset.hide), hidden: b.dataset.h === '1' }, b.dataset.h === '1' ? 'Hidden' : 'Unhidden'));
+    document.querySelectorAll('[data-play]').forEach((b) => b.onclick = async () => {
+      try {
+        const r = await fetch(`/api/admin?voice=${b.dataset.play}`, { headers: { 'x-admin-pass': pass } });
+        if (!r.ok) throw new Error('Could not load that clip');
+        const a = new Audio(URL.createObjectURL(await r.blob())); await a.play();
+      } catch (e) { toast(e.message || 'Could not play that clip'); }
+    });
 
     // ---- danger ----
     $('#cDanger').innerHTML = `<h2>Test Data</h2><p class="sub" style="margin-top:0">After a test ride, clear it so race day starts clean. Deletes all points and cheers and sets the race to Not Started. Setup and course stay.</p>
@@ -778,7 +936,7 @@ function Admin() {
       <button class="btn primary block" id="bSave" style="margin-top:12px">Save Setup</button>`;
     pmap = L.map('pmap', { zoomControl: false, attributionControl: true, dragging: true }).setView([44.73, -85.37], 10);
     pmap.attributionControl.setPrefix(false);
-    tiles().map.addTo(pmap); pLayer = L.layerGroup().addTo(pmap);
+    tiles().sat.addTo(pmap); pLayer = L.layerGroup().addTo(pmap);
     if (D.share) {
       const k = new URL(D.share).searchParams.get('k');
       fetch(`/api/state?k=${encodeURIComponent(k)}&part=course`, { cache: 'no-store' }).then((r) => r.json()).then((j) => {
@@ -812,6 +970,214 @@ function Admin() {
       } catch (e) { if (e.message !== 'auth') toast(e.message, 3500); }
       btn.disabled = false; btn.textContent = 'Save Setup';
     };
+  }
+}
+
+// =====================================================================
+// RACE MODE (Joe's phone during the race) — plays voice messages out loud,
+// shows every cheer (including private ones). Keeps running with the phone locked
+// by playing a near-silent loop on one audio element and swapping in clips.
+// =====================================================================
+function RaceMode() {
+  let pass = store.get('ba_admin') || '';
+  let R = null, items = [], lastId = 0, epoch = null, lastCheck = 0, checking = false;
+  let started = false, player = null, mode = 'idle', playing = null, queue = [], ready = {}, failed = new Set(), stoppedByUs = false;
+  const SILENCE = makeWav(8, 8000, () => (Math.random() - 0.5) * 0.0001);
+  const CHIME = makeWav(1.2, 22050, (t) => {
+    const n1 = Math.exp(-t * 6) * Math.sin(2 * Math.PI * 880 * t);
+    const t2 = t - 0.16, n2 = t2 > 0 ? Math.exp(-t2 * 4) * Math.sin(2 * Math.PI * 1318.5 * t2) : 0;
+    return 0.38 * n1 + 0.42 * n2 + 0.06 * Math.sin(2 * Math.PI * 2637 * t) * Math.exp(-t * 9);
+  });
+
+  if (!pass) return login();
+  shell(); check(true);
+  setInterval(() => { if (!document.hidden) { check(); paintStatus(); } }, 5000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { check(true); paintStatus(); } });
+
+  function login(err) {
+    $('#app').innerHTML = `<div class="wrap"><div class="top"><div class="brand"><img src="/icons/icon-192.png" alt=""><div><div class="t1">Breakaway</div><div class="t2">Race Mode</div></div></div></div>
+      <div class="card"><h3>Enter Passcode</h3><p class="sub" style="margin-top:0">Same passcode as Admin.</p>
+      <input class="field" id="pw" type="password" autocomplete="current-password" placeholder="Passcode">
+      ${err ? `<p class="tiny" style="color:var(--bad)">${esc(err)}</p>` : ''}
+      <button class="btn primary block" id="go" style="margin-top:12px">Unlock</button></div></div>`;
+    const go = () => { const v = $('#pw').value.trim(); if (!v) return; pass = v; store.set('ba_admin', v); shell(); check(true); };
+    $('#go').onclick = go; $('#pw').onkeydown = (e) => { if (e.key === 'Enter') go(); };
+  }
+
+  async function api(method, qs, body) {
+    const r = await fetch('/api/admin' + (qs || ''), { method, cache: 'no-store', headers: { 'Content-Type': 'application/json', 'x-admin-pass': pass }, body: body ? JSON.stringify({ v: APP_VERSION, ...body }) : undefined });
+    if (r.status === 401) { store.del('ba_admin'); pass = ''; login('Wrong passcode. Try again.'); throw new Error('auth'); }
+    if (r.status === 409) { showUpdate(); throw new Error('Update ready, tap reload'); }
+    if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || `Error ${r.status}`); }
+    return r;
+  }
+
+  function shell() {
+    $('#app').innerHTML = `<div class="wrap">
+      <div class="top"><div class="brand"><img src="/icons/icon-192.png" alt=""><div style="min-width:0"><div class="t1">Race Mode</div><div class="t2" id="rmName">…</div></div></div>
+        <a class="pill" href="/#admin" style="color:var(--accent);text-decoration:none">Admin</a></div>
+      <div class="card" id="rmMain"></div>
+      <div class="card" style="padding:0"><div class="stats" id="rmStats"></div></div>
+      <div class="card" id="rmControls"></div>
+      <div class="card"><h2>All Cheers</h2><ul class="feed rmfeed" id="rmFeed"></ul></div>
+      <p class="tiny" style="text-align:center">${APP_VERSION}</p></div>`;
+    paintMain(); paintControls();
+  }
+
+  // ----- polling -----
+  async function check(force) {
+    if (!pass || checking) return;
+    if (!force && Date.now() - lastCheck < 4000) return;
+    checking = true;
+    try {
+      const r = await api('GET', `?part=race&since=${lastId}`);
+      const j = await r.json();
+      lastCheck = Date.now();
+      if (j.now) skew = Date.parse(j.now) - Date.now();
+      if (j.v && j.v !== APP_VERSION) showUpdate();
+      if (epoch !== null && j.epoch !== epoch) { items = []; lastId = 0; queue = []; checking = false; epoch = j.epoch; return check(true); }
+      epoch = j.epoch;
+      R = j;
+      const fresh = (j.cheers || []).filter((c) => Number(c.id) > lastId).sort((a, b) => Number(a.id) - Number(b.id));
+      for (const c of fresh) {
+        items.unshift(c); lastId = Math.max(lastId, Number(c.id));
+        if (c.kind === 'voice' && !c.played_at && !queue.includes(c.id)) { queue.push(c.id); prefetch(c.id); }
+      }
+      if (items.length > 300) items.length = 300;
+      paintAll();
+    } catch (e) { if (e.message !== 'auth') { const el = $('#rmCheck'); if (el) el.textContent = 'Can’t reach Breakaway. Retrying…'; } }
+    checking = false;
+  }
+
+  async function prefetch(id) {
+    if (ready[id]) return;
+    try {
+      const r = await api('GET', `?voice=${id}`);
+      ready[id] = URL.createObjectURL(await r.blob());
+      if (started && mode === 'silence') next();   // jump in right away
+    } catch (e) { setTimeout(() => prefetch(id), 8000); }
+  }
+
+  // ----- audio engine -----
+  function start() {
+    if (!player) {
+      player = new Audio();
+      player.preload = 'auto';
+      player.setAttribute('playsinline', '');
+      player.addEventListener('ended', onEnded);
+      player.addEventListener('error', onError);
+      player.addEventListener('pause', () => { if (!stoppedByUs && !player.ended) setTimeout(paintMain, 300); });
+      player.addEventListener('playing', paintMain);
+    }
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch {}
+    try {
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.metadata = new MediaMetadata({ title: 'Race Mode', artist: 'Breakaway', artwork: [{ src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' }] });
+      }
+    } catch {}
+    started = true; stoppedByUs = false;
+    next(); paintMain();
+  }
+  function stop() {
+    started = false; stoppedByUs = true; mode = 'idle';
+    if (player) { player.pause(); player.removeAttribute('src'); player.load(); }
+    paintMain();
+  }
+  function playSrc(src, m) {
+    mode = m; stoppedByUs = true; player.src = src;
+    const p = player.play(); stoppedByUs = false;
+    if (p && p.catch) p.catch(() => { paintMain(); });
+  }
+  function next() {
+    if (!started) return;
+    const id = R && R.voiceOn === false ? null : queue.find((i) => ready[i]);
+    if (id != null) { playing = id; playSrc(CHIME, 'chime'); }
+    else playSrc(SILENCE, 'silence');
+  }
+  function onEnded() {
+    if (mode === 'chime') { playSrc(ready[playing], 'clip'); paintFeed(); return; }
+    if (mode === 'clip') finishClip(playing);
+    const wasSilence = mode === 'silence';
+    next();
+    if (wasSilence) check();
+  }
+  function onError() {
+    if (mode === 'clip' && playing != null) { failed.add(playing); finishClip(playing); toast('Couldn’t play one voice message (format). It’s in Admin.'); }
+    if (started) setTimeout(next, 500);
+  }
+  function finishClip(id) {
+    queue = queue.filter((x) => x !== id);
+    const it = items.find((c) => c.id === id); if (it) it.played_at = new Date().toISOString();
+    playing = null;
+    api('POST', '', { action: 'played', id: Number(id) }).catch(() => {});
+    paintFeed(); paintMain();
+  }
+  function playNow(id) {
+    if (!ready[id]) { prefetch(id); toast('Loading…'); return; }
+    if (!started) start();
+    if (!queue.includes(id)) queue.unshift(id); else { queue = [id, ...queue.filter((x) => x !== id)]; }
+    playing = id; playSrc(ready[id], 'clip'); paintFeed();
+  }
+
+  // ----- painting -----
+  function paintAll() { paintMain(); paintStats(); paintControls(); paintFeed(); }
+  function paintStatus() {
+    const el = $('#rmCheck'); if (el && lastCheck) el.textContent = `Checked ${ago(new Date(lastCheck + skew).toISOString())}`;
+  }
+  function paintMain() {
+    const el = $('#rmMain'); if (!el) return;
+    if (R) $('#rmName').textContent = R.name || 'Breakaway';
+    const waiting = queue.filter((i) => !failed.has(i)).length;
+    const paused = started && player && player.paused && !player.ended;
+    if (!started) {
+      el.innerHTML = `<h3>Voice Messages Play Out Loud</h3>
+        <p class="sub" style="margin-top:0">Tap Start, then lock your phone and put it in your pocket. Keep Safari on this page. Don’t swipe Safari away.</p>
+        <button class="btn primary block big" id="rmStart">Start Race Mode</button>
+        <button class="btn block" id="rmTest" style="margin-top:8px">Play Test Chime</button>
+        ${navigator.standalone ? `<p class="tiny" style="margin-top:10px">If it stops when your phone locks, open this page in Safari instead of the home-screen icon.</p>` : ''}`;
+      $('#rmStart').onclick = start;
+      $('#rmTest').onclick = () => { const a = new Audio(CHIME); a.play().catch(() => {}); };
+    } else {
+      el.innerHTML = `<div class="statusbig">${paused ? '<span class="dot warn"></span>Paused' : '<span class="dot ok"></span>Listening'}</div>
+        <div class="sub" id="rmCheck">${lastCheck ? `Checked ${ago(new Date(lastCheck + skew).toISOString())}` : 'Checking…'}</div>
+        <div class="sub" style="margin-top:4px">${mode === 'clip' || mode === 'chime' ? '🔊 Playing a voice message' : waiting ? `${waiting} voice message${waiting === 1 ? '' : 's'} loading` : 'No voice messages waiting'}</div>
+        ${paused ? `<button class="btn primary block big" id="rmResume" style="margin-top:12px">Tap to Resume</button>` : ''}
+        <button class="btn block" id="rmStop" style="margin-top:10px">Stop Race Mode</button>`;
+      if ($('#rmResume')) $('#rmResume').onclick = () => { next(); };
+      $('#rmStop').onclick = stop;
+    }
+  }
+  function paintStats() {
+    const el = $('#rmStats'); if (!el || !R) return;
+    const el2 = R.startedAt ? ((R.status === 'finished' && R.finishedAt ? Date.parse(R.finishedAt) : now()) - Date.parse(R.startedAt)) / 1000 : null;
+    el.innerHTML = `<div class="stat"><div class="k">Status</div><div class="v" style="font-size:22px">${R.status === 'live' ? 'Live' : R.status === 'finished' ? 'Finished' : 'Not Started'}</div></div>
+      <div class="stat"><div class="k">Miles Left</div><div class="v num" style="font-size:22px">${R.milesLeft != null ? R.milesLeft.toFixed(1) : '—'}</div></div>
+      <div class="stat"><div class="k">Elapsed</div><div class="v num" style="font-size:22px">${dur(el2)}</div></div>
+      <div class="stat"><div class="k">Phone Battery</div><div class="v num" style="font-size:22px">${R.battery != null ? Math.round(R.battery) + '%' : '—'}</div></div>`;
+  }
+  function paintControls() {
+    const el = $('#rmControls'); if (!el) return;
+    el.innerHTML = `<div class="toggle"><div><div style="font-weight:650">Play Voice Messages</div><div class="tiny">Off = they still save, nothing plays.</div></div>
+        <label class="sw ok"><input type="checkbox" id="rmVoice" ${!R || R.voiceOn ? 'checked' : ''}><span></span></label></div>
+      <div class="toggle"><div><div style="font-weight:650">Mute Cheers to Watch</div><div class="tiny">Stops Watch buzzes. Cheers still show here.</div></div>
+        <label class="sw"><input type="checkbox" id="rmMute" ${R && R.mute ? 'checked' : ''}><span></span></label></div>`;
+    $('#rmVoice').onchange = async (e) => { try { await api('POST', '', { action: 'voice', on: e.target.checked }); if (R) R.voiceOn = e.target.checked; toast(e.target.checked ? 'Voice messages on' : 'Voice messages off'); } catch (err) { toast(err.message); } };
+    $('#rmMute').onchange = async (e) => { try { await api('POST', '', { action: 'mute', on: e.target.checked }); if (R) R.mute = e.target.checked; toast(e.target.checked ? 'Watch muted' : 'Watch unmuted'); } catch (err) { toast(err.message); } };
+  }
+  function paintFeed() {
+    const ul = $('#rmFeed'); if (!ul) return;
+    if (!items.length) { ul.innerHTML = `<li class="tiny" style="justify-content:center">No cheers yet.</li>`; return; }
+    ul.innerHTML = items.map((c) => {
+      const who = esc(c.name || 'Someone');
+      let body;
+      if (c.kind === 'msg') body = `<div class="rmtext">${esc(c.text)}</div>`;
+      else if (c.kind === 'voice') {
+        const state = playing === c.id ? '🔊 Playing' : failed.has(c.id) ? 'Couldn’t play' : c.played_at ? 'Played' : 'New';
+        body = `<div class="row" style="margin-top:4px"><span>🎙️ ${c.audio_secs ? Math.round(c.audio_secs) + 's' : 'Voice'} · ${state}</span><button class="btn" style="min-height:34px;font-size:13px;margin-left:auto" data-rplay="${c.id}">Play</button></div>`;
+      } else body = `<span>${esc(c.emoji)}${c.count > 1 ? `×${c.count}` : ''}</span>`;
+      return `<li><span class="av">${esc((c.name || 'S').slice(0, 1).toUpperCase())}</span><div class="grow"><span class="who">${who}</span> <span class="when" style="float:right" data-t="${esc(c.created_at)}">${shortAgo(c.created_at)}</span>${body}</div></li>`;
+    }).join('');
+    ul.querySelectorAll('[data-rplay]').forEach((b) => b.onclick = () => playNow(isNaN(Number(b.dataset.rplay)) ? b.dataset.rplay : items.find((c) => String(c.id) === b.dataset.rplay).id));
   }
 }
 

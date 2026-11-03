@@ -1,12 +1,13 @@
 // Breakaway shared server code. Files in api/_lib are not routes.
-export const APP_VERSION = 'breakaway-1';
+export const APP_VERSION = 'breakaway-2';
+import crypto from 'node:crypto';
 
 export const RACE_COLS = [
   'id', 'name', 'rider_name', 'race_date', 'planned_start', 'status', 'started_at', 'finished_at',
   'course_name', 'course_miles', 'course_version', 'max_mph', 'mute', 'has_pending', 'last_push_at',
   'data_epoch', 'cur_ts', 'cur_lat', 'cur_lon', 'cur_prog_m', 'cur_speed_mps', 'recent_mps', 'avg_mps',
   'last_ingest_at', 'last_ingest_count', 'last_ingest_stored', 'last_ingest_note', 'last_battery',
-  'last_battery_state', 'ingest_total'
+  'last_battery_state', 'ingest_total', 'voice_on', 'race_mode_seen_at'
 ].join(',');
 
 export const QUICK_EMOJI = ['🔥', '👏', '💪', '🚴', '❄️'];
@@ -14,6 +15,13 @@ export const PRE_WINDOW_MS = 30 * 60 * 1000;   // points kept from 30 min before
 export const POST_WINDOW_MS = 2 * 60 * 1000;   // and 2 min after finish
 export const PUSH_GAP_MS = 2 * 60 * 1000;      // max one push per 2 min
 export const TAPS_ONLY_GAP_MS = 5 * 60 * 1000; // taps-only bundles at most every 5 min
+export const VOICE_MAX_BYTES = 900 * 1024;
+export const VOICE_MIMES = ['audio/mp4', 'audio/aac', 'audio/x-m4a', 'audio/mpeg', 'audio/webm', 'audio/ogg', 'audio/wav'];
+
+// Signed public link for one voice clip (used as the ntfy attachment).
+export function voiceSig(id) {
+  return crypto.createHmac('sha256', process.env.BREAKAWAY_ADMIN_PASS || 'x').update('voice:' + id).digest('hex').slice(0, 24);
+}
 export const MI = 1609.344;
 
 // ---------- Supabase (PostgREST) ----------
@@ -142,7 +150,7 @@ export function snap(course, lat, lon, prevProg, dtS, maxMps) {
 }
 
 // ---------- Push (ntfy) ----------
-export async function ntfy({ title, message, tags, priority, click }) {
+export async function ntfy({ title, message, tags, priority, click, delay, attach, filename }) {
   const topic = process.env.BREAKAWAY_NTFY_TOPIC;
   if (!topic) return { ok: false, error: 'BREAKAWAY_NTFY_TOPIC is not set' };
   const server = (process.env.BREAKAWAY_NTFY_SERVER || 'https://ntfy.sh').replace(/\/+$/, '');
@@ -150,7 +158,7 @@ export async function ntfy({ title, message, tags, priority, click }) {
     const r = await fetch(server, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topic, title, message, tags, priority, click })
+      body: JSON.stringify({ topic, title, message, tags, priority, click, delay, attach, filename })
     });
     return r.ok ? { ok: true } : { ok: false, error: `ntfy ${r.status}` };
   } catch (e) {
@@ -164,49 +172,53 @@ function tapSummary(taps) {
   return Object.entries(by).sort((a, b) => b[1] - a[1]).map(([e, n]) => `${e}×${n}`).join(' ');
 }
 
-// Bundled cheers → Joe's phone/watch. Safe to call often; does nothing unless due.
+// Bundled cheers → Joe's phone/watch. Called right when a cheer comes in (and on polls/ingest as a safety net).
+// Max one push per 2 min: if a push went out recently, the bundle is handed to ntfy with a delivery time
+// (ntfy "delay"), so it arrives on time even if nobody has the page open.
 export async function flushPush(race, origin) {
   if (!race || !race.has_pending) return { sent: false, why: 'none pending' };
   const now = Date.now();
-  const last = race.last_push_at ? Date.parse(race.last_push_at) : 0;
-  if (now - last < PUSH_GAP_MS) return { sent: false, why: 'too soon' };
+  const lastIso = race.last_push_at || '1970-01-01T00:00:00Z';
+  const last = Date.parse(lastIso);
 
-  const pending = await db('GET', `breakaway_cheers?race_id=eq.${race.id}&pushed=eq.false&order=id.asc&limit=300&select=id,kind,emoji,count,name,text,hidden,created_at`);
+  const pending = await db('GET', `breakaway_cheers?race_id=eq.${race.id}&pushed=eq.false&order=id.asc&limit=300&select=id,kind,emoji,count,name,text,hidden,created_at,audio_secs`);
   const ids = pending.map((c) => c.id);
   const markPushed = async (list) => {
     if (list.length) await db('PATCH', `breakaway_cheers?id=in.(${list.join(',')})`, { pushed: true });
   };
-
-  if (race.mute || !pending.length) {
+  const visible = pending.filter((c) => !c.hidden);
+  if (race.mute || !visible.length) {
     await markPushed(ids);
     await patchRace(race.id, { has_pending: false });
     return { sent: false, why: race.mute ? 'muted' : 'empty' };
   }
-  const visible = pending.filter((c) => !c.hidden);
-  const msgs = visible.filter((c) => c.kind === 'msg');
+  const msgs = visible.filter((c) => c.kind === 'msg' || c.kind === 'voice');
   const taps = visible.filter((c) => c.kind === 'quick');
-  if (!visible.length) {
-    await markPushed(ids);
-    await patchRace(race.id, { has_pending: false });
-    return { sent: false, why: 'all hidden' };
-  }
-  if (!msgs.length) {
-    // Taps-only: at most every 5 min, and let them sit 60s so a message can ride along.
+
+  // When should this bundle land?
+  let sendAt;
+  if (msgs.length) sendAt = Math.max(now, last + PUSH_GAP_MS);
+  else {
     const oldest = Math.min(...taps.map((t) => Date.parse(t.created_at)));
-    if (now - last < TAPS_ONLY_GAP_MS || now - oldest < 60000) return { sent: false, why: 'taps wait' };
+    sendAt = Math.max(now, last + TAPS_ONLY_GAP_MS, oldest + 60000);
+    // Taps-only bundles aren't scheduled ahead (that would push a later message back).
+    // They wait here; the next poll/ingest/cheer sends them once they're due.
+    if (sendAt - now > 15000) return { sent: false, why: 'taps wait' };
+    sendAt = now;
   }
 
-  // Claim the push slot atomically so two requests can't both send.
-  const claimed = await patchRace(race.id, { last_push_at: new Date(now).toISOString(), has_pending: false },
-    `&last_push_at=lt.${enc(new Date(now - PUSH_GAP_MS).toISOString())}`);
+  // Claim the slot atomically (only if nobody else changed last_push_at since we read it).
+  const claimed = await patchRace(race.id, { last_push_at: new Date(sendAt).toISOString(), has_pending: false },
+    `&last_push_at=eq.${enc(lastIso)}`);
   if (!claimed || !claimed.length) return { sent: false, why: 'claimed elsewhere' };
   await markPushed(ids);
 
+  const label = (m) => m.kind === 'voice' ? `🎙️ Voice message${m.audio_secs ? ` (${Math.round(m.audio_secs)}s)` : ''}` : m.text;
   let title, message, priority;
   const tapLine = taps.length ? tapSummary(taps) : '';
   if (msgs.length) {
-    title = msgs.length === 1 ? `Cheer from ${msgs[0].name || 'Someone'}` : `${msgs.length} New Cheers`;
-    const shown = msgs.slice(0, 2).map((m) => msgs.length === 1 ? m.text : `${m.name || 'Someone'}: ${m.text}`);
+    title = msgs.length === 1 ? `${msgs[0].kind === 'voice' ? 'Voice From' : 'Cheer From'} ${msgs[0].name || 'Someone'}` : `${msgs.length} New Cheers`;
+    const shown = msgs.slice(0, 2).map((m) => msgs.length === 1 ? label(m) : `${m.name || 'Someone'}: ${label(m)}`);
     const extra = msgs.length > 2 ? `+${msgs.length - 2} more` : '';
     message = [...shown, [extra, tapLine].filter(Boolean).join(' · ')].filter(Boolean).join('\n');
     priority = 4;
@@ -216,11 +228,19 @@ export async function flushPush(race, origin) {
     message = `${tapLine} from ${people} ${people === 1 ? 'person' : 'people'}`;
     priority = 3;
   }
-  const r = await ntfy({ title, message, tags: ['bicyclist'], priority, click: origin ? `${origin}/#admin` : undefined });
+  const voice = msgs.find((m) => m.kind === 'voice');
+  const attach = voice && origin ? `${origin}/api/state?voice=${voice.id}&sig=${voiceSig(voice.id)}` : undefined;
+  const delaySec = Math.round((sendAt - now) / 1000);
+  const r = await ntfy({
+    title, message, tags: ['bicyclist'], priority,
+    click: origin ? `${origin}/#race` : undefined,
+    delay: delaySec >= 10 ? String(Math.floor(sendAt / 1000)) : undefined,
+    attach, filename: attach ? `voice-${voice.id}.m4a` : undefined
+  });
   if (!r.ok) {
     await db('PATCH', `breakaway_cheers?id=in.(${ids.join(',')})`, { pushed: false });
-    await patchRace(race.id, { has_pending: true, last_push_at: race.last_push_at });
+    await patchRace(race.id, { has_pending: true, last_push_at: lastIso });
     return { sent: false, why: r.error };
   }
-  return { sent: true, title, message };
+  return { sent: true, scheduled: delaySec >= 10, sendAt: new Date(sendAt).toISOString(), title, message };
 }

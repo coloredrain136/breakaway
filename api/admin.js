@@ -1,11 +1,13 @@
 // /api/admin — Joe only. Header: x-admin-pass
-// GET  → everything the Admin screen needs (setup, health, cheers, Overland values)
-// POST { action, v, ... } → save | start | end | reopen | not_started | mute | hide | test_push | clear_data
+// GET                      → everything the Admin screen needs (setup, health, cheers, Overland values)
+// GET ?part=race&since=N   → Race Mode feed (all cheers incl. private + voice), marks Race Mode as listening
+// GET ?voice=<id>          → one voice clip (audio bytes)
+// POST { action, v, ... }  → save | start | end | reopen | not_started | mute | voice | hide | played | test_push | clear_data
 import {
   db, dbCount, getRace, patchRace, send, bodyOf, originOf, same, sleep, ntfy, APP_VERSION, MI
 } from './_lib/core.js';
 
-const ACTIONS = ['save', 'start', 'end', 'reopen', 'not_started', 'mute', 'hide', 'test_push', 'clear_data'];
+const ACTIONS = ['save', 'start', 'end', 'reopen', 'not_started', 'mute', 'voice', 'hide', 'played', 'test_push', 'clear_data'];
 
 function cleanCourse(c) {
   if (!c || !Array.isArray(c.pts) || c.pts.length < 2 || c.pts.length > 20000) return null;
@@ -35,12 +37,41 @@ export default async function handler(req, res) {
     }
     const origin = originOf(req);
 
+    if (req.method === 'GET' && req.query?.voice) {
+      const id = Number(req.query.voice);
+      const rows = Number.isFinite(id) ? await db('GET', `breakaway_voice?cheer_id=eq.${id}&select=mime,data`) : [];
+      if (!rows[0]) return send(res, 404, { error: 'not found' });
+      const buf = Buffer.from(rows[0].data, 'base64');
+      res.statusCode = 200;
+      res.setHeader('Content-Type', rows[0].mime);
+      res.setHeader('Content-Length', buf.length);
+      res.setHeader('Cache-Control', 'private, max-age=86400');
+      return res.end(buf);
+    }
+
+    if (req.method === 'GET' && req.query?.part === 'race') {
+      const since = Number(req.query.since || 0) || 0;
+      const nowIso = new Date().toISOString();
+      const [cheers] = await Promise.all([
+        db('GET', `breakaway_cheers?race_id=eq.${race.id}&hidden=eq.false&id=gt.${since}&order=id.desc&limit=200&select=id,kind,emoji,count,name,text,created_at,audio_secs,played_at`),
+        db('PATCH', `breakaway_races?id=eq.${race.id}`, { race_mode_seen_at: nowIso })
+      ]);
+      return send(res, 200, {
+        v: APP_VERSION, now: nowIso,
+        status: race.status, name: race.name, rider: race.rider_name, mute: race.mute, voiceOn: race.voice_on !== false,
+        startedAt: race.started_at, finishedAt: race.finished_at,
+        milesLeft: race.cur_prog_m != null && race.course_miles ? Math.max(0, Math.round((race.course_miles - race.cur_prog_m / MI) * 10) / 10) : null,
+        battery: race.last_battery, epoch: race.data_epoch,
+        cheers
+      });
+    }
+
     if (req.method === 'GET') {
       const [pointCount, badCount, lastPt, cheers] = await Promise.all([
         dbCount(`breakaway_points?race_id=eq.${race.id}`),
         dbCount(`breakaway_points?race_id=eq.${race.id}&bad=eq.true`),
         db('GET', `breakaway_points?race_id=eq.${race.id}&order=received_at.desc&limit=1&select=ts,received_at,off_m,bad`),
-        db('GET', `breakaway_cheers?race_id=eq.${race.id}&order=id.desc&limit=300&select=id,kind,emoji,count,name,text,hidden,pushed,created_at`)
+        db('GET', `breakaway_cheers?race_id=eq.${race.id}&order=id.desc&limit=300&select=id,kind,emoji,count,name,text,hidden,pushed,created_at,audio_secs,played_at`)
       ]);
       const trackUrl = `${origin}/api/track`;
       const token = process.env.BREAKAWAY_TRACK_TOKEN || '';
@@ -57,7 +88,8 @@ export default async function handler(req, res) {
           batteryState: race.last_battery_state,
           ingestTotal: race.ingest_total,
           pointCount, badCount,
-          lastPoint: lastPt[0] || null
+          lastPoint: lastPt[0] || null,
+          raceModeSeenAt: race.race_mode_seen_at
         },
         config: {
           supabase: true,
@@ -118,6 +150,13 @@ export default async function handler(req, res) {
         break;
       case 'mute':
         await patchRace(race.id, { mute: !!b.on });
+        break;
+      case 'voice':
+        await patchRace(race.id, { voice_on: !!b.on });
+        break;
+      case 'played':
+        if (!Number.isFinite(Number(b.id))) return send(res, 400, { error: 'bad id' });
+        await db('PATCH', `breakaway_cheers?id=eq.${Number(b.id)}&race_id=eq.${race.id}`, { played_at: now });
         break;
       case 'hide':
         if (!Number.isFinite(Number(b.id))) return send(res, 400, { error: 'bad id' });
