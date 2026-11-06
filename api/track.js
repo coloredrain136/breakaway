@@ -1,7 +1,7 @@
 // POST /api/track — Overland GPS Tracker sends batches here.
 // Must answer {"result":"ok"} or Overland keeps the points and re-sends them.
 import {
-  db, getRace, patchRace, send, bodyOf, originOf, same, hav, snap, flushPush, enc,
+  db, getRace, patchRace, send, bodyOf, originOf, same, hav, snap, flushPush, enc, notifyFollowers,
   PRE_WINDOW_MS, POST_WINDOW_MS, MI
 } from './_lib/core.js';
 
@@ -165,6 +165,10 @@ export default async function handler(req, res) {
     const updated = await patchRace(race.id, patch);
     const fresh = updated?.[0] || { ...race, ...patch };
     try { await flushPush(fresh, originOf(req)); } catch (e) { console.error('push', e.message); }
+    // Auto start / auto finish → tell followers who turned on notifications.
+    if (status !== race.status && (status === 'live' || status === 'finished')) {
+      await notifyFollowers(fresh, originOf(req), status === 'live' ? 'start' : 'finish');
+    }
     return send(res, 200, { result: 'ok' });
   } catch (e) {
     console.error('track error', e.message);

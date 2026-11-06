@@ -1,5 +1,5 @@
 // Breakaway shared server code. Files in api/_lib are not routes.
-export const APP_VERSION = 'breakaway-3';
+export const APP_VERSION = 'breakaway-4';
 import crypto from 'node:crypto';
 
 export const RACE_COLS = [
@@ -166,10 +166,18 @@ export async function ntfy({ title, message, tags, priority, click, delay, attac
   }
 }
 
+// "Irina ❄️×2 🔥 · Mom 💪×3" — who sent what, biggest senders first.
 function tapSummary(taps) {
-  const by = {};
-  for (const t of taps) by[t.emoji] = (by[t.emoji] || 0) + (t.count || 1);
-  return Object.entries(by).sort((a, b) => b[1] - a[1]).map(([e, n]) => `${e}×${n}`).join(' ');
+  const people = new Map();
+  for (const t of taps) {
+    const who = t.name || 'Someone';
+    if (!people.has(who)) people.set(who, { total: 0, by: {} });
+    const p = people.get(who);
+    p.by[t.emoji] = (p.by[t.emoji] || 0) + (t.count || 1);
+    p.total += t.count || 1;
+  }
+  return [...people.entries()].sort((a, b) => b[1].total - a[1].total).map(([who, p]) =>
+    `${who} ${Object.entries(p.by).sort((a, b) => b[1] - a[1]).map(([e, n]) => n > 1 ? `${e}×${n}` : e).join(' ')}`).join(' · ');
 }
 
 // Bundled cheers → Joe's phone/watch. Called right when a cheer comes in (and on polls/ingest as a safety net).
@@ -223,9 +231,10 @@ export async function flushPush(race, origin) {
     message = [...shown, [extra, tapLine].filter(Boolean).join(' · ')].filter(Boolean).join('\n');
     priority = 4;
   } else {
-    const people = new Set(taps.map((t) => t.name || 'Someone')).size;
-    title = `${taps.reduce((s, t) => s + (t.count || 1), 0)} Cheers`;
-    message = `${tapLine} from ${people} ${people === 1 ? 'person' : 'people'}`;
+    const names = [...new Set(taps.map((t) => t.name || 'Someone'))];
+    const n = taps.reduce((s, t) => s + (t.count || 1), 0);
+    title = names.length === 1 ? `${n} ${n === 1 ? 'Cheer' : 'Cheers'} From ${names[0]}` : `${n} Cheers From ${names.length} People`;
+    message = tapLine;
     priority = 3;
   }
   const voice = msgs.find((m) => m.kind === 'voice');
@@ -243,4 +252,92 @@ export async function flushPush(race, origin) {
     return { sent: false, why: r.error };
   }
   return { sent: true, scheduled: delaySec >= 10, sendAt: new Date(sendAt).toISOString(), title, message };
+}
+
+// ---------- Live numbers (shared by the follower page and Race Mode) ----------
+const r1 = (n) => Math.round(n * 10) / 10;
+export function liveStats(race, now = Date.now()) {
+  const status = race.status;
+  const total = race.course_miles || null;
+  const prog = race.cur_prog_m != null ? race.cur_prog_m / MI : null;
+  let milesDone = null, milesLeft = null, eta = null;
+  if (status === 'finished') { milesDone = total; milesLeft = total != null ? 0 : null; }
+  else if (prog != null && total) { milesDone = Math.min(prog, total); milesLeft = Math.max(0, total - milesDone); }
+  if (status === 'live' && milesLeft != null && race.cur_ts) {
+    const rec = race.recent_mps, avg = race.avg_mps;
+    const blend = rec != null && avg != null ? 0.6 * rec + 0.4 * avg : (rec ?? avg);
+    if (blend && blend > 0.6) {
+      const etaMs = Date.parse(race.cur_ts) + (milesLeft * MI) / blend * 1000;
+      const step = (etaMs - now) > 20 * 60000 ? 5 * 60000 : 60000;
+      eta = new Date(Math.round(etaMs / step) * step).toISOString();
+    }
+  }
+  const planned = race.planned_start ? Date.parse(race.planned_start) : null;
+  const curVisible = status !== 'finished' && race.cur_ts && (status === 'live' || (planned != null && Date.parse(race.cur_ts) >= planned - PRE_WINDOW_MS));
+  const fresh = race.cur_ts && now - Date.parse(race.cur_ts) < 3 * 60000;
+  return {
+    total, curVisible: !!curVisible,
+    milesDone: milesDone != null ? r1(milesDone) : null,
+    milesLeft: milesLeft != null ? r1(milesLeft) : null,
+    speedMph: curVisible && fresh && race.cur_speed_mps != null ? r1(race.cur_speed_mps * 2.23694) : null,
+    avgMph: race.avg_mps != null ? r1(race.avg_mps * 2.23694) : null,
+    eta
+  };
+}
+
+// ---------- Follower web push ("Notify me when Joe starts") ----------
+let webpushMod = null;
+async function webpush() {
+  if (!webpushMod) {
+    const m = await import('web-push');
+    webpushMod = m.default || m;
+    webpushMod.setVapidDetails('mailto:breakaway@example.com', process.env.BREAKAWAY_VAPID_PUBLIC, process.env.BREAKAWAY_VAPID_PRIVATE);
+  }
+  return webpushMod;
+}
+export function pushReady() { return !!(process.env.BREAKAWAY_VAPID_PUBLIC && process.env.BREAKAWAY_VAPID_PRIVATE); }
+
+function fmtDur(sec) {
+  sec = Math.max(0, Math.round(sec));
+  const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60;
+  return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
+}
+
+// kind: 'start' | 'finish' | 'test'. Never throws; returns { sent, failed, removed }.
+export async function notifyFollowers(race, origin, kind) {
+  const out = { sent: 0, failed: 0, removed: 0 };
+  try {
+    if (!pushReady() || !race) return out;
+    const subs = await db('GET', `breakaway_push_subs?race_id=eq.${race.id}&select=id,endpoint,p256dh,auth`);
+    if (!subs.length) return out;
+    const rider = race.rider_name || 'Joe';
+    const key = process.env.BREAKAWAY_VIEW_KEY || '';
+    const url = origin ? `${origin}/?k=${encodeURIComponent(key)}` : '/';
+    let title, body;
+    if (kind === 'start') { title = `${rider} just started ${race.name || 'the race'}! 🚴`; body = 'Tap to watch live and send a cheer.'; }
+    else if (kind === 'finish') {
+      const t = race.started_at && race.finished_at ? fmtDur((Date.parse(race.finished_at) - Date.parse(race.started_at)) / 1000) : null;
+      title = `${rider} finished! 🎉`; body = t ? `GPS time ${t}. Tap to see the finish.` : 'Tap to see the finish.';
+    } else { title = 'Breakaway notifications are on ✅'; body = `You'll get a push when ${rider} starts and finishes.`; }
+    const wp = await webpush();
+    const payload = JSON.stringify({ title, body, url, tag: `breakaway-${kind}` });
+    const gone = [];
+    await Promise.all(subs.map(async (s) => {
+      try {
+        await wp.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, { TTL: 3600, urgency: 'high', timeout: 8000 });
+        out.sent++;
+      } catch (e) {
+        out.failed++;
+        if (e && (e.statusCode === 404 || e.statusCode === 410)) gone.push(s.id);
+      }
+    }));
+    if (gone.length) { await db('DELETE', `breakaway_push_subs?id=in.(${gone.join(',')})`); out.removed = gone.length; }
+  } catch (e) { console.error('notifyFollowers', e.message); }
+  return out;
+}
+
+export async function pushOne(sub, title, body, url) {
+  const wp = await webpush();
+  return wp.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+    JSON.stringify({ title, body, url, tag: 'breakaway-test' }), { TTL: 600, urgency: 'high', timeout: 8000 });
 }

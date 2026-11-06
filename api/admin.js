@@ -4,10 +4,10 @@
 // GET ?voice=<id>          → one voice clip (audio bytes)
 // POST { action, v, ... }  → save | start | end | reopen | not_started | mute | voice | hide | played | test_push | clear_data
 import {
-  db, dbCount, getRace, patchRace, send, bodyOf, originOf, same, sleep, ntfy, APP_VERSION, MI
+  db, dbCount, getRace, patchRace, send, bodyOf, originOf, same, sleep, ntfy, liveStats, notifyFollowers, pushReady, APP_VERSION, MI
 } from './_lib/core.js';
 
-const ACTIONS = ['save', 'start', 'end', 'reopen', 'not_started', 'mute', 'voice', 'hide', 'played', 'test_push', 'clear_data'];
+const ACTIONS = ['save', 'start', 'end', 'reopen', 'not_started', 'mute', 'voice', 'hide', 'played', 'test_push', 'clear_data', 'arm', 'golive', 'notify_test'];
 
 function cleanCourse(c) {
   if (!c || !Array.isArray(c.pts) || c.pts.length < 2 || c.pts.length > 20000) return null;
@@ -49,6 +49,11 @@ export default async function handler(req, res) {
       return res.end(buf);
     }
 
+    if (req.method === 'GET' && req.query?.part === 'course') {
+      const full = await getRace(true);
+      return send(res, 200, { v: APP_VERSION, courseVersion: full?.course_version || 0, course: full?.course || null });
+    }
+
     if (req.method === 'GET' && req.query?.part === 'race') {
       const since = Number(req.query.since || 0) || 0;
       const nowIso = new Date().toISOString();
@@ -56,22 +61,27 @@ export default async function handler(req, res) {
         db('GET', `breakaway_cheers?race_id=eq.${race.id}&hidden=eq.false&id=gt.${since}&order=id.desc&limit=200&select=id,kind,emoji,count,name,text,created_at,audio_secs,played_at`),
         db('PATCH', `breakaway_races?id=eq.${race.id}`, { race_mode_seen_at: nowIso })
       ]);
+      const L = liveStats(race);
       return send(res, 200, {
         v: APP_VERSION, now: nowIso,
         status: race.status, name: race.name, rider: race.rider_name, mute: race.mute, voiceOn: race.voice_on !== false,
-        startedAt: race.started_at, finishedAt: race.finished_at,
-        milesLeft: race.cur_prog_m != null && race.course_miles ? Math.max(0, Math.round((race.course_miles - race.cur_prog_m / MI) * 10) / 10) : null,
+        plannedStart: race.planned_start, startedAt: race.started_at, finishedAt: race.finished_at,
+        hasCourse: race.course_miles != null, courseVersion: race.course_version || 0, courseMiles: L.total,
+        milesLeft: L.milesLeft, milesDone: L.milesDone, speedMph: L.speedMph, avgMph: L.avgMph, eta: L.eta,
+        cur: L.curVisible ? { ts: race.cur_ts, lat: race.cur_lat, lon: race.cur_lon } : null,
+        lastIngestAt: race.last_ingest_at, lastIngestNote: race.last_ingest_note,
         battery: race.last_battery, epoch: race.data_epoch,
         cheers
       });
     }
 
     if (req.method === 'GET') {
-      const [pointCount, badCount, lastPt, cheers] = await Promise.all([
+      const [pointCount, badCount, lastPt, cheers, pushSubs] = await Promise.all([
         dbCount(`breakaway_points?race_id=eq.${race.id}`),
         dbCount(`breakaway_points?race_id=eq.${race.id}&bad=eq.true`),
         db('GET', `breakaway_points?race_id=eq.${race.id}&order=received_at.desc&limit=1&select=ts,received_at,off_m,bad`),
-        db('GET', `breakaway_cheers?race_id=eq.${race.id}&order=id.desc&limit=300&select=id,kind,emoji,count,name,text,hidden,pushed,created_at,audio_secs,played_at`)
+        db('GET', `breakaway_cheers?race_id=eq.${race.id}&order=id.desc&limit=300&select=id,kind,emoji,count,name,text,hidden,pushed,created_at,audio_secs,played_at`),
+        pushReady() ? dbCount(`breakaway_push_subs?race_id=eq.${race.id}`).catch(() => null) : Promise.resolve(null)
       ]);
       const trackUrl = `${origin}/api/track`;
       const token = process.env.BREAKAWAY_TRACK_TOKEN || '';
@@ -104,6 +114,7 @@ export default async function handler(req, res) {
           setupLink: `overland://setup?url=${encodeURIComponent(trackUrl)}&token=${encodeURIComponent(token)}&device_id=joe`
         },
         ntfyTopic: process.env.BREAKAWAY_NTFY_TOPIC || null,
+        followers: { ready: pushReady(), count: pushSubs },
         cheers
       });
     }
@@ -137,11 +148,30 @@ export default async function handler(req, res) {
         break;
       }
       case 'start':
-        await patchRace(race.id, { status: 'live', started_at: now, finished_at: null });
+      case 'golive': {
+        if (race.status === 'live') break;
+        const u = await patchRace(race.id, { status: 'live', started_at: now, finished_at: null });
+        await notifyFollowers(u?.[0] || race, origin, 'start');
         break;
-      case 'end':
-        await patchRace(race.id, { status: 'finished', finished_at: now, started_at: race.started_at || now });
+      }
+      case 'arm': {
+        // Race Mode's one Start button. With a course + wave time, the race goes Live by itself
+        // when Joe rolls out (auto-start). Without them (a test), it goes Live right now.
+        if (race.status !== 'not_started') return send(res, 200, { ok: true, status: race.status });
+        if (race.course_miles && race.planned_start) return send(res, 200, { ok: true, status: 'not_started', armed: true });
+        const u = await patchRace(race.id, { status: 'live', started_at: now, finished_at: null });
+        await notifyFollowers(u?.[0] || race, origin, 'start');
+        return send(res, 200, { ok: true, status: 'live' });
+      }
+      case 'end': {
+        const u = await patchRace(race.id, { status: 'finished', finished_at: now, started_at: race.started_at || now });
+        await notifyFollowers(u?.[0] || race, origin, 'finish');
         break;
+      }
+      case 'notify_test': {
+        const r = await notifyFollowers(race, origin, 'test');
+        return send(res, 200, { ok: true, ...r });
+      }
       case 'reopen':
         await patchRace(race.id, { status: 'live', finished_at: null, started_at: race.started_at || now });
         break;

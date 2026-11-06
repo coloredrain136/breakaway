@@ -2,9 +2,8 @@
 // GET /api/state?k=VIEW_KEY&part=course                     → the course line (fetched once)
 // GET /api/state?voice=<id>&sig=<sig>                        → one voice clip (signed link, used by ntfy)
 // Feed privacy: emoji taps are shared; messages + voice only come back to the device that sent them (&d=).
-import { db, getRace, send, same, flushPush, originOf, voiceSig, APP_VERSION, MI, PRE_WINDOW_MS } from './_lib/core.js';
+import { db, getRace, send, same, flushPush, originOf, voiceSig, liveStats, APP_VERSION, PRE_WINDOW_MS } from './_lib/core.js';
 
-const r1 = (n) => Math.round(n * 10) / 10;
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return send(res, 405, { error: 'GET only' });
@@ -62,28 +61,8 @@ export default async function handler(req, res) {
     ]);
     const feed = [...taps, ...mine.map((m) => ({ ...m, mine: true }))].sort((a, b) => Number(b.id) - Number(a.id)).slice(0, 40);
 
-    const total = race.course_miles || null;
-    const prog = race.cur_prog_m != null ? race.cur_prog_m / MI : null;
-    let milesDone = null, milesLeft = null, eta = null;
-    if (status === 'finished') { milesDone = total; milesLeft = 0; }
-    else if (prog != null && total) {
-      milesDone = Math.min(prog, total);
-      milesLeft = Math.max(0, total - milesDone);
-    }
-    if (status === 'live' && milesLeft != null && race.cur_ts) {
-      const rec = race.recent_mps, avg = race.avg_mps;
-      const blend = rec != null && avg != null ? 0.6 * rec + 0.4 * avg : (rec ?? avg);
-      if (blend && blend > 0.6) {
-        const etaMs = Date.parse(race.cur_ts) + (milesLeft * MI) / blend * 1000;
-        const step = (etaMs - now) > 20 * 60000 ? 5 * 60000 : 60000;   // round so it doesn't jitter
-        eta = new Date(Math.round(etaMs / step) * step).toISOString();
-      }
-    }
-
-    // Live position is only shared while not finished.
-    const curVisible = status !== 'finished' && race.cur_ts && (status === 'live' || (planned != null && Date.parse(race.cur_ts) >= planned - PRE_WINDOW_MS));
-    const fresh = race.cur_ts && now - Date.parse(race.cur_ts) < 3 * 60000;
-
+    const L = liveStats(race, now);
+    const curVisible = L.curVisible;
     return send(res, 200, {
       v: APP_VERSION,
       now: new Date(now).toISOString(),
@@ -95,19 +74,20 @@ export default async function handler(req, res) {
       startedAt: race.started_at,
       finishedAt: race.finished_at,
       courseVersion: race.course_version || 0,
-      courseMiles: total,
+      courseMiles: L.total,
       epoch: race.data_epoch,
       cur: curVisible ? { ts: race.cur_ts, lat: race.cur_lat, lon: race.cur_lon } : null,
-      milesDone: milesDone != null ? r1(milesDone) : null,
-      milesLeft: milesLeft != null ? r1(milesLeft) : null,
-      speedMph: curVisible && fresh && race.cur_speed_mps != null ? r1(race.cur_speed_mps * 2.23694) : null,
-      avgMph: race.avg_mps != null ? r1(race.avg_mps * 2.23694) : null,
-      eta,
+      milesDone: L.milesDone,
+      milesLeft: L.milesLeft,
+      speedMph: L.speedMph,
+      avgMph: L.avgMph,
+      eta: L.eta,
       lastSeen: curVisible ? race.cur_ts : null,
       battery: status !== 'finished' ? race.last_battery : null,
       points: points.map((p) => [p.id, Math.round(p.lat * 1e6) / 1e6, Math.round(p.lon * 1e6) / 1e6]),
       feed,
       voiceOn: race.voice_on !== false,
+      vapid: process.env.BREAKAWAY_VAPID_PUBLIC || null,
       totals: Object.fromEntries(totals.map((t) => [t.emoji, t.total]))
     });
   } catch (e) {

@@ -83,6 +83,9 @@ button{cursor:pointer}
 .btn.ok{color:#d6ffe9;border-color:rgba(91,227,160,.4);background:linear-gradient(180deg,rgba(91,227,160,.24),rgba(91,227,160,.08))}
 .btn:disabled{opacity:.45;pointer-events:none}
 .btn.block{width:100%}
+.btn.hold{position:relative;overflow:hidden;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.btn.hold .holdfill{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(255,111,111,.45)}
+.btn.hold .holdlbl{position:relative}
 .row{display:flex;gap:var(--s2);align-items:center}
 .row.wrapr{flex-wrap:wrap}
 .grow{flex:1;min-width:0}
@@ -200,6 +203,55 @@ label.lbl{display:block;font-size:13px;color:var(--ink2);margin:var(--s3) 0 6px;
 .sw.ok input:checked+span{background:var(--ok)}
 .btn.big{min-height:58px;font-size:18px;border-radius:var(--r2)}
 .rmfeed{max-height:none}
+/* ---------- Race Mode (CarPlay-style) ---------- */
+.rmx{max-width:560px;margin:0 auto;padding:var(--topPad) 14px calc(env(safe-area-inset-bottom) + 30px);display:flex;flex-direction:column;gap:12px}
+.rm-side{order:1;display:flex;flex-direction:column;gap:10px}
+.rm-map{order:2;position:relative;height:40vh;min-height:250px;border-radius:var(--r1);overflow:hidden;border:1px solid var(--stroke);box-shadow:var(--spec),var(--shadow)}
+.rm-more{order:3}
+#rmMap{position:absolute;inset:0;background:#0b1320}
+.rm-bar{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.rm-bar-r{display:flex;gap:12px;align-items:center}
+.rm-pill{display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border-radius:99px;font-size:15px;font-weight:700;border:1px solid var(--stroke2);background:var(--glass2)}
+.rm-pill.live{border-color:rgba(255,111,111,.5);color:#ffd6d6}
+.rm-pill.arm{border-color:var(--accentLine);color:var(--accent2)}
+.rm-mini{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:650;color:var(--ink2)}
+.rm-hero,.rm-tile,.rm-banner{background:var(--glass);border:1px solid var(--stroke);box-shadow:var(--spec),var(--shadow);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur)}
+.rm-hero{border-radius:var(--r1);padding:16px;text-align:center}
+.rm-k{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);font-weight:700}
+.rm-big{font-size:96px;font-weight:800;line-height:1;letter-spacing:-.04em;margin:4px 0 2px;background:linear-gradient(180deg,#fff,var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.rm-big small{font-size:26px;font-weight:700;margin-left:4px;letter-spacing:0}
+.rm-sub{color:var(--ink2);font-size:15px;min-height:18px}
+.rm-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.rm-tile{border-radius:var(--r2);padding:10px 8px;text-align:center}
+.rm-v{font-size:26px;font-weight:750;letter-spacing:-.02em;margin-top:2px;white-space:nowrap}
+.rm-v small{font-size:12px;font-weight:650;color:var(--ink2);margin-left:2px}
+.rm-banner{border-radius:var(--r2);padding:12px 14px;display:flex;align-items:center;gap:12px;transition:box-shadow .3s,border-color .3s}
+.rm-banner .av{flex:none;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;background:var(--accentDim);color:var(--accent2);border:1px solid var(--accentLine)}
+.rm-bt{font-size:18px;font-weight:650;line-height:1.3;margin-top:2px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.rm-banner.flash{border-color:var(--accentLine);box-shadow:0 0 0 3px var(--accentDim),var(--shadow)}
+.rm-banner.playing{border-color:rgba(91,227,160,.45);background:linear-gradient(180deg,rgba(91,227,160,.18),rgba(91,227,160,.06))}
+.rm-eq{flex:none;width:40px;height:40px;display:flex;align-items:flex-end;justify-content:center;gap:3px;padding-bottom:8px}
+.rm-eq i{width:5px;border-radius:3px;background:var(--ok);animation:eq .9s ease-in-out infinite}
+.rm-eq i:nth-child(2){animation-delay:.15s}.rm-eq i:nth-child(3){animation-delay:.3s}.rm-eq i:nth-child(4){animation-delay:.45s}
+@keyframes eq{0%,100%{height:6px}50%{height:24px}}
+.rm-go{min-height:64px;font-size:20px;border-radius:var(--r2)}
+.rm-checks{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.rm-check{display:flex;align-items:center;gap:10px;font-size:14px;padding:9px 12px;border-radius:var(--r3);background:rgba(0,0,0,.25);border:1px solid var(--stroke)}
+.rm-check.bad{border-color:rgba(255,111,111,.35)}
+.rm-mini-btn{min-height:32px;font-size:12px;margin-left:auto;padding:0 10px;flex:none}
+@media (orientation:landscape) and (max-height:600px){
+  body.rmode{overflow:hidden}
+  .rmx{max-width:none;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:12px;height:100vh;height:100dvh;
+    padding:max(10px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
+  .rm-map{grid-column:1;grid-row:1;height:auto;min-height:0}
+  .rm-side{grid-column:2;grid-row:1;overflow:auto;gap:8px;padding-bottom:6px}
+  .rm-more{display:none}
+  .rm-hero{padding:8px 10px}
+  .rm-big{font-size:60px}
+  .rm-v{font-size:20px}
+  .rm-bt{font-size:16px}
+  .rm-go{min-height:52px}
+}
 .rmtext{font-size:19px;line-height:1.35;margin-top:3px;font-weight:550}
 .sw input:checked+span::after{transform:translateX(20px)}
 .pmapwrap{position:relative;height:220px;border-radius:var(--r2);overflow:hidden;margin-top:var(--s3);border:1px solid var(--stroke)}
@@ -213,7 +265,7 @@ ol.tips b{color:var(--ink)}
 <script src="/vendor/leaflet.js"></script>
 <script>
 'use strict';
-const APP_VERSION = 'breakaway-3';
+const APP_VERSION = 'breakaway-4';
 const QUICK = ['🔥', '👏', '💪', '🚴', '❄️'];
 const MI = 1609.344;
 if (navigator.standalone || matchMedia('(display-mode: standalone)').matches) document.documentElement.classList.add('standalone');
@@ -303,6 +355,18 @@ function drawCourse(map, pts, layerGroup) {
   return L.latLngBounds(ll);
 }
 
+// Press-and-hold button (for things you never want to hit by accident).
+function holdBtn(btn, ms, fn) {
+  let t = null, start = 0, raf = null;
+  const fill = btn.querySelector('.holdfill');
+  const reset = () => { clearTimeout(t); cancelAnimationFrame(raf); t = null; if (fill) fill.style.width = '0%'; };
+  const tick = () => { if (!t) return; if (fill) fill.style.width = Math.min(100, (Date.now() - start) / ms * 100) + '%'; raf = requestAnimationFrame(tick); };
+  const down = (e) => { e.preventDefault(); start = Date.now(); t = setTimeout(() => { reset(); if (navigator.vibrate) navigator.vibrate(30); fn(); }, ms); tick(); };
+  btn.addEventListener('pointerdown', down);
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => btn.addEventListener(ev, reset));
+  btn.addEventListener('contextmenu', (e) => e.preventDefault());
+}
+
 // ---------- sounds ----------
 let actx = null;
 function unlockChime() {
@@ -372,6 +436,7 @@ function Live(key) {
       <span class="pill" id="chip"><span class="dot"></span><span>…</span></span>
     </div>
     <div id="heroSlot"></div>
+    <div id="notifySlot"></div>
     <div class="card mapcard"><div id="map"></div>
       <div class="mapbtns"><button class="mapbtn" id="layerBtn">Map</button></div>
       <button class="recenter on" id="recBtn" aria-label="Recenter Map">${RECENTER_SVG}</button>
@@ -531,6 +596,7 @@ function Live(key) {
       b.querySelector('.c').textContent = n > 999 ? Math.round(n / 100) / 10 + 'k' : n;
     }
     renderFeed();
+    renderNotify();
     document.querySelectorAll('.rn').forEach((x) => { x.textContent = rn; });
     $('#micBtn').classList.toggle('hidden', S.voiceOn === false);
     tick();
@@ -640,6 +706,64 @@ function Live(key) {
     }
     const fresh = await fetch(`/api/state?k=${encodeURIComponent(key)}&since=${lastId}&epoch=${epoch}&d=${deviceId()}`, { cache: 'no-store' }).then((r) => r.json()).catch(() => null);
     if (fresh && fresh.epoch === epoch) { for (const p of fresh.points || []) { trail.push([p[1], p[2]]); lastId = Math.max(lastId, p[0]); } localBump = {}; S = fresh; render(); }
+  }
+
+  // ----- "Notify me when Joe starts" (web push) -----
+  let notifyKey = '';
+  function pushSupported() { return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
+  function renderNotify() {
+    const el = $('#notifySlot'); if (!el || !S) return;
+    const rn = S.rider || 'Joe';
+    const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+    const standalone = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
+    let state = 'hide';
+    if (S.vapid && S.status !== 'finished') {
+      if (pushSupported()) state = store.get('ba_push') === '1' && Notification.permission === 'granted' ? 'on' : 'off';
+      else if (isIOS && !standalone) state = 'ios';
+    }
+    const key = state + rn;
+    if (key === notifyKey) return; notifyKey = key;
+    if (state === 'hide') { el.innerHTML = ''; return; }
+    if (state === 'on') {
+      el.innerHTML = `<div class="card row" style="padding:12px 16px"><span style="font-size:22px">🔔</span><div class="grow"><div style="font-weight:650">Notifications On</div><div class="tiny">You’ll get a push when ${esc(rn)} starts and finishes.</div></div><button class="btn" id="nOff" style="min-height:36px;font-size:13px">Turn Off</button></div>`;
+      $('#nOff').onclick = unsubscribe;
+    } else if (state === 'off') {
+      el.innerHTML = `<div class="card row" style="padding:12px 16px"><span style="font-size:22px">🔔</span><div class="grow"><div style="font-weight:650">Get a Push When ${esc(rn)} Starts</div><div class="tiny">And when he finishes. Nothing else.</div></div><button class="btn primary" id="nOn" style="min-height:40px">Notify Me</button></div>`;
+      $('#nOn').onclick = subscribe;
+    } else {
+      el.innerHTML = `<div class="card" style="padding:14px 16px"><div class="row"><span style="font-size:22px">🔔</span><div style="font-weight:650">Want a Push When ${esc(rn)} Starts?</div></div>
+        <ol class="tips" style="margin-top:6px"><li>Tap <b>Share</b> (the square with the arrow)</li><li>Tap <b>Add to Home Screen</b></li><li>Open <b>Breakaway</b> from your home screen and tap <b>Notify Me</b></li></ol>
+        <div class="tiny" style="margin-top:6px">iPhone only allows website notifications from the home screen.</div></div>`;
+    }
+  }
+  function b64u(s) { const p = '='.repeat((4 - s.length % 4) % 4); const b = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(b, (c) => c.charCodeAt(0)); }
+  async function subscribe() {
+    const btn = $('#nOn');
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') { toast('Notifications were blocked. You can allow them in Settings.', 3500); return; }
+      if (btn) { btn.disabled = true; btn.textContent = '…'; }
+      const reg = await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.ready;
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(S.vapid) });
+      const r = await fetch('/api/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ k: key, v: APP_VERSION, action: 'subscribe', sub: sub.toJSON(), device: deviceId(), name }) });
+      if (r.status === 409) { showUpdate(); throw new Error('A new version is ready. Tap reload.'); }
+      if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || 'Couldn’t turn on notifications'); }
+      store.set('ba_push', '1'); notifyKey = ''; renderNotify();
+      toast('Notifications on ✓');
+    } catch (e) { toast(e.message || 'Couldn’t turn on notifications', 3500); notifyKey = ''; renderNotify(); }
+  }
+  async function unsubscribe() {
+    try {
+      const reg = await navigator.serviceWorker.getRegistration();
+      const sub = reg && await reg.pushManager.getSubscription();
+      if (sub) {
+        await fetch('/api/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ k: key, v: APP_VERSION, action: 'unsubscribe', sub: sub.toJSON() }) }).catch(() => {});
+        await sub.unsubscribe();
+      }
+    } catch {}
+    store.del('ba_push'); notifyKey = ''; renderNotify(); toast('Notifications off');
   }
 
   // ----- voice messages (15 s max) -----
@@ -826,15 +950,11 @@ function Admin() {
       ${R.finished_at ? `<div class="kv"><span class="k">Finished</span><span class="v num">${clock(R.finished_at)}</span></div>` : ''}
       ${el != null ? `<div class="kv"><span class="k">${st === 'finished' ? 'Finish Time' : 'Elapsed'}</span><span class="v num" id="aElapsed">${dur(el)}</span></div>` : ''}
       ${R.cur_prog_m != null && R.course_miles ? `<div class="kv"><span class="k">On Course</span><span class="v num">${(R.cur_prog_m / MI).toFixed(1)} of ${R.course_miles.toFixed(1)} mi</span></div>` : ''}
-      <div class="btngrid">
-        ${st !== 'live' ? `<button class="btn ok" id="bStart">Start Race</button>` : `<button class="btn danger" id="bEnd">End Race</button>`}
-        ${st === 'finished' ? `<button class="btn" id="bReopen">Reopen Race</button>` : `<button class="btn" id="bNS" ${st === 'not_started' ? 'disabled' : ''}>Set Not Started</button>`}
-      </div>
-      <p class="tiny" style="margin-top:10px">Start and finish are auto-detected (rolls 0.25 mi down the course after the planned start / gets within 100 m of the finish). These buttons override.</p>`;
+      ${st === 'not_started' ? `<button class="btn ok block" id="bStart" style="margin-top:12px">Start Race Now</button>` : ''}
+      ${st === 'finished' ? `<button class="btn block" id="bReopen" style="margin-top:12px">Reopen Race</button>` : ''}
+      <p class="tiny" style="margin-top:10px">Race day: you don’t press anything here. Race Mode’s <b>Start My Race</b> gets it ready, it goes Live by itself when you roll out after your wave time, and it finishes by itself at Timber Ridge. End Race is at the bottom of this page.</p>`;
     if ($('#bStart')) armed($('#bStart'), 'Tap Again to Start', () => act({ action: 'start' }, 'Race is live'));
-    if ($('#bEnd')) armed($('#bEnd'), 'Tap Again to End', () => act({ action: 'end' }, 'Race ended'));
     if ($('#bReopen')) armed($('#bReopen'), 'Tap Again to Reopen', () => act({ action: 'reopen' }, 'Reopened'));
-    if ($('#bNS')) armed($('#bNS'), 'Tap Again to Confirm', () => act({ action: 'not_started' }, 'Set to Not Started'));
 
     // ---- health ----
     const ing = H.lastIngestAt ? (now() - Date.parse(H.lastIngestAt)) / 1000 : null;
@@ -874,7 +994,13 @@ function Admin() {
     // ---- share ----
     $('#cShare').innerHTML = `<h2>Share</h2>
       ${D.share ? `<div class="copyrow"><code>${esc(D.share)}</code></div>
-      <div class="btngrid"><button class="btn primary" data-copy="${esc(D.share)}">Copy Share Link</button><a class="btn" href="${esc(D.share)}" target="_blank" rel="noopener">Preview Live View</a></div>` : `<p class="sub">Set BREAKAWAY_VIEW_KEY in Vercel first.</p>`}`;
+      <div class="btngrid"><button class="btn primary" data-copy="${esc(D.share)}">Copy Share Link</button><a class="btn" href="${esc(D.share)}" target="_blank" rel="noopener">Preview Live View</a></div>` : `<p class="sub">Set BREAKAWAY_VIEW_KEY in Vercel first.</p>`}
+      <div class="kv" style="margin-top:10px"><span class="k">Followers With Notifications On</span><span class="v num">${D.followers?.ready ? (D.followers.count ?? 0) : 'Not set up'}</span></div>
+      ${D.followers?.ready ? `<button class="btn block" id="bNotifyTest" style="margin-top:6px">Send Test to Followers</button>` : ''}
+      <p class="tiny" style="margin-top:6px">They get a push when you start and when you finish. On iPhone they need to add the Live View to their home screen first, then tap Notify Me.</p>`;
+    if ($('#bNotifyTest')) $('#bNotifyTest').onclick = async () => {
+      try { const r = await api('POST', { action: 'notify_test' }); const j = await r; toast(`Sent to ${j.sent ?? 0} follower${j.sent === 1 ? '' : 's'}`); } catch (e) { if (e.message !== 'auth') toast(e.message); }
+    };
 
     // ---- setup (render once so typing isn't wiped by refresh) ----
     if (!formLoaded) { renderSetup(); formLoaded = true; }
@@ -916,8 +1042,13 @@ function Admin() {
     });
 
     // ---- danger ----
-    $('#cDanger').innerHTML = `<h2>Test Data</h2><p class="sub" style="margin-top:0">After a test ride, clear it so race day starts clean. Deletes all points and cheers and sets the race to Not Started. Setup and course stay.</p>
+    $('#cDanger').innerHTML = `<h2>Race Controls &amp; Test Data</h2>
+      ${st === 'live' ? `<p class="sub" style="margin-top:0">Only if it didn’t finish by itself.</p><button class="btn danger block hold" id="bEnd"><span class="holdfill"></span><span class="holdlbl">Hold to End Race</span></button>` : ''}
+      ${st !== 'not_started' ? `<button class="btn block" id="bNS" style="margin-top:8px">Set Not Started</button>` : ''}
+      <p class="sub" style="margin:14px 0 8px">After a test ride, clear it so race day starts clean. Deletes all points and cheers and sets the race to Not Started. Setup, course and followers’ notifications stay.</p>
       <button class="btn danger block" id="bClear">Clear Test Data</button>`;
+    if ($('#bEnd')) holdBtn($('#bEnd'), 1500, () => act({ action: 'end' }, 'Race ended'));
+    if ($('#bNS')) armed($('#bNS'), 'Tap Again to Confirm', () => act({ action: 'not_started' }, 'Set to Not Started'));
     armed($('#bClear'), 'Tap Again to Delete Everything', () => act({ action: 'clear_data' }, 'Cleared'));
 
     document.querySelectorAll('[data-copy]').forEach((b) => b.onclick = () => copy(b.dataset.copy));
@@ -989,29 +1120,33 @@ function Admin() {
 }
 
 // =====================================================================
-// RACE MODE (Joe's phone during the race) — plays voice messages out loud,
-// shows every cheer (including private ones). Keeps running with the phone locked
-// by playing a near-silent loop on one audio element and swapping in clips.
+// RACE MODE — Joe's race-day screen. CarPlay-style dashboard (portrait + landscape),
+// one Start button, voice messages out loud with the phone locked.
+// Audio: one element loops an 8 s near-silent WAV (keeps Safari alive when locked)
+// and swaps in chime → clip for each new voice message.
 // =====================================================================
 function RaceMode() {
   let pass = store.get('ba_admin') || '';
-  let R = null, items = [], lastId = 0, epoch = null, lastCheck = 0, checking = false;
+  let R = null, items = [], lastId = 0, epoch = null, lastCheck = 0, checking = false, checkStarted = 0;
   let started = false, player = null, mode = 'idle', playing = null, queue = [], ready = {}, failed = new Set(), stoppedByUs = false;
+  let map = null, courseLayer = null, dot = null, courseVer = -1, courseBounds = null, follow = true, flashId = null;
   const SILENCE = makeWav(8, 8000, () => (Math.random() - 0.5) * 0.0001);
   const CHIME = makeWav(1.2, 22050, (t) => {
     const n1 = Math.exp(-t * 6) * Math.sin(2 * Math.PI * 880 * t);
     const t2 = t - 0.16, n2 = t2 > 0 ? Math.exp(-t2 * 4) * Math.sin(2 * Math.PI * 1318.5 * t2) : 0;
     return 0.38 * n1 + 0.42 * n2 + 0.06 * Math.sin(2 * Math.PI * 2637 * t) * Math.exp(-t * 9);
   });
+  document.body.classList.add('rmode');
 
   if (!pass) return login();
   shell(); check(true);
-  setInterval(() => { if (!document.hidden) { check(); paintStatus(); } }, 5000);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) { check(true); paintStatus(); } });
+  setInterval(() => { if (!document.hidden) { check(); tick(); } }, 1000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { check(true); paintAll(); } });
+  window.addEventListener('resize', () => { if (map) setTimeout(() => { map.invalidateSize(); recenter(false); }, 250); });
 
   function login(err) {
     $('#app').innerHTML = `<div class="wrap"><div class="top"><div class="brand"><img src="/icons/race-192.png" alt=""><div><div class="t1">Breakaway</div><div class="t2">Race Mode</div></div></div></div>
-      <div class="card"><h3>Enter Passcode</h3><p class="sub" style="margin-top:0">Same passcode as Admin.</p>
+      <div class="card"><h3>Enter Passcode</h3><p class="sub" style="margin-top:0">Same passcode as Admin. Saved after the first time.</p>
       <input class="field" id="pw" type="password" autocomplete="current-password" placeholder="Passcode">
       ${err ? `<p class="tiny" style="color:var(--bad)">${esc(err)}</p>` : ''}
       <button class="btn primary block" id="go" style="margin-top:12px">Unlock</button></div></div>`;
@@ -1027,23 +1162,65 @@ function RaceMode() {
     return r;
   }
 
+  // ---------- layout ----------
   function shell() {
-    $('#app').innerHTML = `<div class="wrap">
-      <div class="top"><div class="brand"><img src="/icons/race-192.png" alt=""><div style="min-width:0"><div class="t1">Race Mode</div><div class="t2" id="rmName">…</div></div></div>
-</div>
-      <div class="card" id="rmMain"></div>
-      <div class="card" style="padding:0"><div class="stats" id="rmStats"></div></div>
-      <div class="card" id="rmControls"></div>
-      <div class="card"><h2>All Cheers</h2><ul class="feed rmfeed" id="rmFeed"></ul></div>
-      <p class="tiny" style="text-align:center">${APP_VERSION}</p></div>`;
-    paintMain(); paintControls();
+    $('#app').innerHTML = `<div class="rmx">
+      <div class="rm-map"><div id="rmMap"></div>
+        <button class="recenter on" id="rmRec" aria-label="Recenter Map">${RECENTER_SVG}</button></div>
+      <div class="rm-side">
+        <div class="rm-bar">
+          <span class="rm-pill" id="rmStatus"><span class="dot"></span>…</span>
+          <span class="rm-bar-r"><span id="rmGpsMini" class="rm-mini"><span class="dot"></span>GPS</span><span id="rmBatt" class="rm-mini num">🔋 —</span></span>
+        </div>
+        <div class="rm-hero">
+          <div class="rm-k" id="rmHeroK">Miles Left</div>
+          <div class="rm-big num" id="rmHero">—</div>
+          <div class="rm-sub num" id="rmHeroSub"></div>
+        </div>
+        <div class="rm-tiles">
+          <div class="rm-tile"><div class="rm-k">ETA</div><div class="rm-v num" id="rmEta">—</div></div>
+          <div class="rm-tile"><div class="rm-k">Speed</div><div class="rm-v num" id="rmSpeed">—</div></div>
+          <div class="rm-tile"><div class="rm-k">Elapsed</div><div class="rm-v num" id="rmElapsed">—</div></div>
+        </div>
+        <div class="rm-banner" id="rmBanner"></div>
+        <div id="rmStart"></div>
+      </div>
+      <div class="rm-more">
+        <div class="card" id="rmControls"></div>
+        <div class="card"><h2>All Cheers</h2><ul class="feed rmfeed" id="rmFeed"></ul></div>
+        <p class="tiny" style="text-align:center">${APP_VERSION}</p>
+      </div>
+    </div>`;
+    map = L.map('rmMap', { zoomControl: false, attributionControl: true }).setView([44.73, -85.37], 10);
+    map.attributionControl.setPrefix(false);
+    tiles().sat.addTo(map);
+    courseLayer = L.layerGroup().addTo(map);
+    map.on('dragstart', () => setFollow(false));
+    $('#rmRec').onclick = () => { setFollow(true); recenter(true); };
+    paintAll();
+  }
+  function setFollow(on) { follow = on; const b = $('#rmRec'); if (b) b.classList.toggle('on', on); }
+  function recenter(force) {
+    if (!map) return;
+    if (R && R.cur && R.status === 'live') { if (follow || force) map.setView([R.cur.lat, R.cur.lon], Math.max(map.getZoom(), 14)); }
+    else if (courseBounds && (follow || force)) map.fitBounds(courseBounds, { padding: [20, 20] });
+    else if (R && R.cur && (follow || force)) map.setView([R.cur.lat, R.cur.lon], 13);
+  }
+  async function loadCourse() {
+    try {
+      const j = await (await api('GET', '?part=course')).json();
+      courseVer = j.courseVersion;
+      courseBounds = drawCourse(map, j.course && j.course.pts, courseLayer);
+      recenter(true);
+    } catch {}
   }
 
-  // ----- polling -----
+  // ---------- polling ----------
   async function check(force) {
-    if (!pass || checking) return;
-    if (!force && Date.now() - lastCheck < 4000) return;
-    checking = true;
+    if (!pass) return;
+    if (checking && Date.now() - checkStarted < 15000) return;   // a request frozen by iOS can't block us forever
+    if (!force && Date.now() - lastCheck < 4500) return;
+    checking = true; checkStarted = Date.now();
     try {
       const r = await api('GET', `?part=race&since=${lastId}`);
       const j = await r.json();
@@ -1053,14 +1230,16 @@ function RaceMode() {
       if (epoch !== null && j.epoch !== epoch) { items = []; lastId = 0; queue = []; checking = false; epoch = j.epoch; return check(true); }
       epoch = j.epoch;
       R = j;
+      if (map && j.courseVersion !== courseVer) loadCourse();
       const fresh = (j.cheers || []).filter((c) => Number(c.id) > lastId).sort((a, b) => Number(a.id) - Number(b.id));
       for (const c of fresh) {
         items.unshift(c); lastId = Math.max(lastId, Number(c.id));
         if (c.kind === 'voice' && !c.played_at && !queue.includes(c.id)) { queue.push(c.id); prefetch(c.id); }
+        if (lastCheck && fresh.length < 10) flashId = c.id;
       }
       if (items.length > 300) items.length = 300;
       paintAll();
-    } catch (e) { if (e.message !== 'auth') { const el = $('#rmCheck'); if (el) el.textContent = 'Can’t reach Breakaway. Retrying…'; } }
+    } catch (e) { /* shown via the GPS/check status */ }
     checking = false;
   }
 
@@ -1069,55 +1248,54 @@ function RaceMode() {
     try {
       const r = await api('GET', `?voice=${id}`);
       ready[id] = URL.createObjectURL(await r.blob());
-      if (started && mode === 'silence') next();   // jump in right away
+      if (started && mode === 'silence') next();
     } catch (e) { setTimeout(() => prefetch(id), 8000); }
   }
 
-  // ----- audio engine -----
-  function start() {
+  // ---------- audio engine (unchanged from breakaway-2) ----------
+  function startAudio() {
     if (!player) {
       player = new Audio();
       player.preload = 'auto';
       player.setAttribute('playsinline', '');
       player.addEventListener('ended', onEnded);
       player.addEventListener('error', onError);
-      player.addEventListener('pause', () => { if (!stoppedByUs && !player.ended) setTimeout(paintMain, 300); });
-      player.addEventListener('playing', paintMain);
+      player.addEventListener('pause', () => { if (!stoppedByUs && !player.ended) setTimeout(paintAll, 300); });
+      player.addEventListener('playing', paintAll);
     }
     try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch {}
     try {
-      if ('mediaSession' in navigator) {
-        navigator.mediaSession.metadata = new MediaMetadata({ title: 'Race Mode', artist: 'Breakaway', artwork: [{ src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' }] });
-      }
+      if ('mediaSession' in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: 'Race Mode', artist: 'Breakaway', artwork: [{ src: '/icons/race-512.png', sizes: '512x512', type: 'image/png' }] });
     } catch {}
     started = true; stoppedByUs = false;
-    next(); paintMain();
+    next();
   }
-  function stop() {
+  function stopAudio() {
     started = false; stoppedByUs = true; mode = 'idle';
     if (player) { player.pause(); player.removeAttribute('src'); player.load(); }
-    paintMain();
+    paintAll();
   }
   function playSrc(src, m) {
     mode = m; stoppedByUs = true; player.src = src;
     const p = player.play(); stoppedByUs = false;
-    if (p && p.catch) p.catch(() => { paintMain(); });
+    if (p && p.catch) p.catch(() => paintAll());
   }
   function next() {
     if (!started) return;
     const id = R && R.voiceOn === false ? null : queue.find((i) => ready[i]);
     if (id != null) { playing = id; playSrc(CHIME, 'chime'); }
     else playSrc(SILENCE, 'silence');
+    paintBanner();
   }
   function onEnded() {
-    if (mode === 'chime') { playSrc(ready[playing], 'clip'); paintFeed(); return; }
+    if (mode === 'chime') { playSrc(ready[playing], 'clip'); paintBanner(); paintFeed(); return; }
     if (mode === 'clip') finishClip(playing);
     const wasSilence = mode === 'silence';
     next();
     if (wasSilence) check();
   }
   function onError() {
-    if (mode === 'clip' && playing != null) { failed.add(playing); finishClip(playing); toast('Couldn’t play one voice message (format). It’s in Admin.'); }
+    if (mode === 'clip' && playing != null) { failed.add(playing); finishClip(playing); toast('Couldn’t play one voice message. It’s in Admin.'); }
     if (started) setTimeout(next, 500);
   }
   function finishClip(id) {
@@ -1125,59 +1303,134 @@ function RaceMode() {
     const it = items.find((c) => c.id === id); if (it) it.played_at = new Date().toISOString();
     playing = null;
     api('POST', '', { action: 'played', id: Number(id) }).catch(() => {});
-    paintFeed(); paintMain();
+    paintAll();
   }
   function playNow(id) {
     if (!ready[id]) { prefetch(id); toast('Loading…'); return; }
-    if (!started) start();
-    if (!queue.includes(id)) queue.unshift(id); else { queue = [id, ...queue.filter((x) => x !== id)]; }
-    playing = id; playSrc(ready[id], 'clip'); paintFeed();
+    if (!started) startAudio();
+    queue = [id, ...queue.filter((x) => x !== id)];
+    playing = id; playSrc(ready[id], 'clip'); paintAll();
   }
 
-  // ----- painting -----
-  function paintAll() { paintMain(); paintStats(); paintControls(); paintFeed(); }
-  function paintStatus() {
-    const el = $('#rmCheck'); if (el && lastCheck) el.textContent = `Checked ${ago(new Date(lastCheck + skew).toISOString())}`;
+  // ---------- one Start button ----------
+  async function startMyRace() {
+    startAudio();                       // must happen inside the tap (iPhone audio rule)
+    paintAll();
+    try {
+      const j = await (await api('POST', '', { action: 'arm' })).json();
+      if (R) R.status = j.status || R.status;
+      toast(j.status === 'live' ? 'You’re live 🚴' : j.armed ? 'Ready. It goes Live when you roll out.' : 'Race Mode on');
+    } catch (e) { if (e.message !== 'auth') toast(e.message); }
+    check(true);
   }
-  function paintMain() {
-    const el = $('#rmMain'); if (!el) return;
-    if (R) $('#rmName').textContent = R.name || 'Breakaway';
-    const waiting = queue.filter((i) => !failed.has(i)).length;
-    const paused = started && player && player.paused && !player.ended;
-    if (!started) {
-      el.innerHTML = `<h3>Voice Messages Play Out Loud</h3>
-        <p class="sub" style="margin-top:0">Tap Start, then lock your phone and put it in your pocket. Keep Safari on this page. Don’t swipe Safari away.</p>
-        <button class="btn primary block big" id="rmStart">Start Race Mode</button>
-        <button class="btn block" id="rmTest" style="margin-top:8px">Play Test Chime</button>
-        ${navigator.standalone ? `<p class="tiny" style="margin-top:10px">If it stops when your phone locks, open this page in Safari instead of the home-screen icon.</p>` : ''}`;
-      $('#rmStart').onclick = start;
-      $('#rmTest').onclick = () => { const a = new Audio(CHIME); a.play().catch(() => {}); };
-    } else {
-      el.innerHTML = `<div class="statusbig">${paused ? '<span class="dot warn"></span>Paused' : '<span class="dot ok"></span>Listening'}</div>
-        <div class="sub" id="rmCheck">${lastCheck ? `Checked ${ago(new Date(lastCheck + skew).toISOString())}` : 'Checking…'}</div>
-        <div class="sub" style="margin-top:4px">${mode === 'clip' || mode === 'chime' ? '🔊 Playing a voice message' : waiting ? `${waiting} voice message${waiting === 1 ? '' : 's'} loading` : 'No voice messages waiting'}</div>
-        ${paused ? `<button class="btn primary block big" id="rmResume" style="margin-top:12px">Tap to Resume</button>` : ''}
-        <button class="btn block" id="rmStop" style="margin-top:10px">Stop Race Mode</button>`;
-      if ($('#rmResume')) $('#rmResume').onclick = () => { next(); };
-      $('#rmStop').onclick = stop;
+
+  // ---------- status helpers ----------
+  function gpsState() {
+    if (!R || !R.lastIngestAt) return { cls: 'bad', txt: 'GPS Off', long: 'Overland hasn’t sent anything' };
+    const s = (now() - Date.parse(R.lastIngestAt)) / 1000;
+    if (s < 90) return { cls: 'ok', txt: 'GPS', long: 'GPS sending' };
+    if (s < 300) return { cls: 'warn', txt: 'GPS', long: `GPS quiet ${Math.round(s / 60)}m (dead zone?)` };
+    return { cls: 'bad', txt: 'GPS Off', long: `GPS off · last heard ${ago(R.lastIngestAt)}` };
+  }
+  function listenState() {
+    if (!started) return { cls: 'bad', txt: 'Voice Off' };
+    if (player && player.paused && !player.ended) return { cls: 'warn', txt: 'Paused' };
+    return { cls: 'ok', txt: 'Listening' };
+  }
+  function raceState() {
+    if (!R) return { cls: '', txt: '…' };
+    if (R.status === 'live') return { cls: 'live', txt: 'Live' };
+    if (R.status === 'finished') return { cls: 'ok', txt: 'Finished' };
+    if (R.hasCourse && R.plannedStart) return { cls: 'arm', txt: `Ready · ${clock(R.plannedStart)}` };
+    return { cls: 'warn', txt: 'Not Set Up' };
+  }
+
+  // ---------- painting ----------
+  function paintAll() { paintTop(); paintHero(); paintBanner(); paintStart(); paintControls(); paintFeed(); paintMap(); }
+  function paintTop() {
+    const rs = raceState(), g = gpsState();
+    const st = $('#rmStatus'); if (!st) return;
+    st.className = 'rm-pill ' + rs.cls;
+    st.innerHTML = `<span class="dot ${rs.cls === 'live' ? 'live' : rs.cls === 'ok' ? 'ok' : rs.cls === 'warn' ? 'warn' : ''}"></span>${esc(rs.txt)}`;
+    $('#rmGpsMini').innerHTML = `<span class="dot ${g.cls}"></span>${g.txt}`;
+    $('#rmBatt').textContent = R && R.battery != null ? `🔋 ${Math.round(R.battery)}%` : '🔋 —';
+  }
+  function paintHero() {
+    if (!R) return;
+    const K = $('#rmHeroK'), H = $('#rmHero'), S = $('#rmHeroSub');
+    if (R.status === 'finished') {
+      const t = R.startedAt && R.finishedAt ? (Date.parse(R.finishedAt) - Date.parse(R.startedAt)) / 1000 : null;
+      K.textContent = 'Finished 🎉'; H.textContent = dur(t); S.textContent = R.avgMph ? `Avg ${R.avgMph} mph` : '';
+    } else if (R.status === 'live') {
+      if (R.milesLeft != null) { K.textContent = 'Miles Left'; H.innerHTML = `${R.milesLeft.toFixed(1)}`; S.textContent = R.milesDone != null && R.courseMiles ? `${R.milesDone.toFixed(1)} of ${R.courseMiles.toFixed(1)} mi done` : ''; }
+      else { K.textContent = 'Speed'; H.innerHTML = R.speedMph != null ? `${R.speedMph.toFixed(0)}<small>mph</small>` : '—'; S.textContent = R.hasCourse ? 'Finding you on the course…' : 'No course loaded (test)'; }
+    } else if (R.plannedStart) {
+      K.textContent = 'Starts In'; H.textContent = '—'; S.textContent = `Your wave · ${clock(R.plannedStart)}`;
+    } else { K.textContent = 'Not Set Up'; H.textContent = '—'; S.textContent = 'Set your wave time in Admin'; }
+    tick();
+  }
+  function tick() {
+    if (!R) return;
+    if (R.status !== 'live' && R.status !== 'finished' && R.plannedStart) {
+      const sec = (Date.parse(R.plannedStart) - now()) / 1000;
+      const H = $('#rmHero'); if (H) H.textContent = sec > 0 ? countdown(sec) : 'Roll Out';
     }
+    const el = R.startedAt ? ((R.status === 'finished' && R.finishedAt ? Date.parse(R.finishedAt) : now()) - Date.parse(R.startedAt)) / 1000 : null;
+    const E = $('#rmElapsed'); if (E) E.textContent = el != null ? dur(el) : '—';
+    const eta = $('#rmEta'); if (eta) eta.textContent = R.status === 'live' && R.eta ? clock(R.eta) : R.status === 'finished' ? clock(R.finishedAt) : '—';
+    const sp = $('#rmSpeed'); if (sp) sp.innerHTML = R.status === 'live' && R.speedMph != null ? `${R.speedMph.toFixed(0)}<small>mph</small>` : R.status === 'finished' && R.avgMph ? `${R.avgMph}<small>avg</small>` : '—';
+    const g = gpsState(); const gm = $('#rmGpsMini'); if (gm) gm.innerHTML = `<span class="dot ${g.cls}"></span>${g.txt}`;
+    const ck = $('#rmChecks'); if (ck) paintChecks(ck);
   }
-  function paintStats() {
-    const el = $('#rmStats'); if (!el || !R) return;
-    const el2 = R.startedAt ? ((R.status === 'finished' && R.finishedAt ? Date.parse(R.finishedAt) : now()) - Date.parse(R.startedAt)) / 1000 : null;
-    el.innerHTML = `<div class="stat"><div class="k">Status</div><div class="v" style="font-size:22px">${R.status === 'live' ? 'Live' : R.status === 'finished' ? 'Finished' : 'Not Started'}</div></div>
-      <div class="stat"><div class="k">Miles Left</div><div class="v num" style="font-size:22px">${R.milesLeft != null ? R.milesLeft.toFixed(1) : '—'}</div></div>
-      <div class="stat"><div class="k">Elapsed</div><div class="v num" style="font-size:22px">${dur(el2)}</div></div>
-      <div class="stat"><div class="k">Phone Battery</div><div class="v num" style="font-size:22px">${R.battery != null ? Math.round(R.battery) + '%' : '—'}</div></div>`;
+  function paintBanner() {
+    const b = $('#rmBanner'); if (!b) return;
+    if ((mode === 'chime' || mode === 'clip') && playing != null) {
+      const c = items.find((x) => x.id === playing);
+      b.className = 'rm-banner playing';
+      b.innerHTML = `<span class="rm-eq"><i></i><i></i><i></i><i></i></span><div class="grow"><div class="rm-k">Playing Voice Message</div><div class="rm-bt">${esc(c ? c.name || 'Someone' : 'Someone')}${c && c.audio_secs ? ` · ${Math.round(c.audio_secs)}s` : ''}</div></div>`;
+      return;
+    }
+    const c = items[0];
+    if (!c) { b.className = 'rm-banner'; b.innerHTML = `<span class="av">💬</span><div class="grow"><div class="rm-k">Cheers</div><div class="rm-bt" style="color:var(--ink2)">None yet. They’ll show up here.</div></div>`; return; }
+    const body = c.kind === 'msg' ? esc(c.text) : c.kind === 'voice' ? `🎙️ Voice message${c.audio_secs ? ` · ${Math.round(c.audio_secs)}s` : ''}` : `${esc(c.emoji)}${c.count > 1 ? `×${c.count}` : ''}`;
+    b.className = 'rm-banner' + (flashId === c.id ? ' flash' : '');
+    b.innerHTML = `<span class="av">${esc((c.name || 'S').slice(0, 1).toUpperCase())}</span><div class="grow"><div class="rm-k">${esc(c.name || 'Someone')} · ${shortAgo(c.created_at)} ago</div><div class="rm-bt">${body}</div></div>`;
+    if (flashId === c.id) setTimeout(() => { flashId = null; b.classList.remove('flash'); }, 8000);
+  }
+  function paintChecks(el) {
+    const g = gpsState(), l = listenState(), r = raceState();
+    el.innerHTML = `
+      <div class="rm-check ${g.cls}"><span class="dot ${g.cls}"></span><span>${esc(g.long)}</span>${g.cls === 'bad' ? `<a class="btn rm-mini-btn" href="overland://">Open Overland</a>` : ''}</div>
+      <div class="rm-check ${l.cls}"><span class="dot ${l.cls}"></span><span>${l.txt === 'Listening' ? 'Voice messages: listening' : l.txt === 'Paused' ? 'Voice paused' : 'Voice messages: off'}</span>${l.cls === 'warn' ? `<button class="btn rm-mini-btn" id="rmResume">Resume</button>` : ''}</div>
+      <div class="rm-check ${r.cls === 'live' || r.cls === 'arm' || r.cls === 'ok' ? 'ok' : 'warn'}"><span class="dot ${r.cls === 'live' ? 'live' : r.cls === 'arm' || r.cls === 'ok' ? 'ok' : 'warn'}"></span><span>${R && R.status === 'live' ? 'Race is Live' : R && R.status === 'finished' ? 'Race finished' : r.cls === 'arm' ? `Goes Live when you roll out (wave ${clock(R.plannedStart)})` : 'No course / wave time yet'}</span></div>`;
+    const rb = $('#rmResume'); if (rb) rb.onclick = () => next();
+  }
+  function paintStart() {
+    const el = $('#rmStart'); if (!el) return;
+    if (!started) {
+      el.innerHTML = `<button class="btn primary block rm-go" id="rmGo">Start My Race</button>
+        <p class="tiny" style="text-align:center;margin:6px 0 0">Overland on first. Then tap this, lock your phone, and ride.</p>
+        <div class="rm-checks" id="rmChecks"></div>`;
+      $('#rmGo').onclick = startMyRace;
+    } else {
+      const late = R && R.status === 'not_started' && R.plannedStart && now() - Date.parse(R.plannedStart) > 3 * 60000;
+      el.innerHTML = `<div class="rm-checks" id="rmChecks"></div>
+        ${late ? `<button class="btn ok block hold" id="rmLive" style="margin-top:8px"><span class="holdfill" style="background:rgba(91,227,160,.4)"></span><span class="holdlbl">Didn’t go Live? Hold to Go Live Now</span></button>` : ''}`;
+      if ($('#rmLive')) holdBtn($('#rmLive'), 1200, async () => { try { await api('POST', '', { action: 'golive' }); toast('You’re live 🚴'); check(true); } catch (e) { toast(e.message); } });
+    }
+    const ck = $('#rmChecks'); if (ck) paintChecks(ck);
   }
   function paintControls() {
     const el = $('#rmControls'); if (!el) return;
     el.innerHTML = `<div class="toggle"><div><div style="font-weight:650">Play Voice Messages</div><div class="tiny">Off = they still save, nothing plays.</div></div>
         <label class="sw ok"><input type="checkbox" id="rmVoice" ${!R || R.voiceOn ? 'checked' : ''}><span></span></label></div>
       <div class="toggle"><div><div style="font-weight:650">Mute Cheers to Watch</div><div class="tiny">Stops Watch buzzes. Cheers still show here.</div></div>
-        <label class="sw"><input type="checkbox" id="rmMute" ${R && R.mute ? 'checked' : ''}><span></span></label></div>`;
+        <label class="sw"><input type="checkbox" id="rmMute" ${R && R.mute ? 'checked' : ''}><span></span></label></div>
+      <div class="row" style="margin-top:8px"><button class="btn grow" id="rmTest">Play Test Chime</button>${started ? `<button class="btn grow" id="rmStop">Stop Voice</button>` : ''}</div>`;
     $('#rmVoice').onchange = async (e) => { try { await api('POST', '', { action: 'voice', on: e.target.checked }); if (R) R.voiceOn = e.target.checked; toast(e.target.checked ? 'Voice messages on' : 'Voice messages off'); } catch (err) { toast(err.message); } };
     $('#rmMute').onchange = async (e) => { try { await api('POST', '', { action: 'mute', on: e.target.checked }); if (R) R.mute = e.target.checked; toast(e.target.checked ? 'Watch muted' : 'Watch unmuted'); } catch (err) { toast(err.message); } };
+    $('#rmTest').onclick = () => { const a = new Audio(CHIME); a.play().catch(() => {}); };
+    if ($('#rmStop')) $('#rmStop').onclick = stopAudio;
   }
   function paintFeed() {
     const ul = $('#rmFeed'); if (!ul) return;
@@ -1190,9 +1443,20 @@ function RaceMode() {
         const state = playing === c.id ? '🔊 Playing' : failed.has(c.id) ? 'Couldn’t play' : c.played_at ? 'Played' : 'New';
         body = `<div class="row" style="margin-top:4px"><span>🎙️ ${c.audio_secs ? Math.round(c.audio_secs) + 's' : 'Voice'} · ${state}</span><button class="btn" style="min-height:34px;font-size:13px;margin-left:auto" data-rplay="${c.id}">Play</button></div>`;
       } else body = `<span>${esc(c.emoji)}${c.count > 1 ? `×${c.count}` : ''}</span>`;
-      return `<li><span class="av">${esc((c.name || 'S').slice(0, 1).toUpperCase())}</span><div class="grow"><span class="who">${who}</span> <span class="when" style="float:right" data-t="${esc(c.created_at)}">${shortAgo(c.created_at)}</span>${body}</div></li>`;
+      return `<li><span class="av">${esc((c.name || 'S').slice(0, 1).toUpperCase())}</span><div class="grow"><span class="who">${who}</span> <span class="when" style="float:right">${shortAgo(c.created_at)}</span>${body}</div></li>`;
     }).join('');
-    ul.querySelectorAll('[data-rplay]').forEach((b) => b.onclick = () => playNow(isNaN(Number(b.dataset.rplay)) ? b.dataset.rplay : items.find((c) => String(c.id) === b.dataset.rplay).id));
+    ul.querySelectorAll('[data-rplay]').forEach((b) => b.onclick = () => { const it = items.find((c) => String(c.id) === b.dataset.rplay); if (it) playNow(it.id); });
+  }
+  function paintMap() {
+    if (!map || !R) return;
+    if (R.cur) {
+      const ll = [R.cur.lat, R.cur.lon];
+      if (!dot) {
+        dot = L.marker(ll, { icon: L.divIcon({ className: 'rider', html: '<div class="ring"></div><div class="core"></div>', iconSize: [0, 0] }), zIndexOffset: 1000, interactive: false }).addTo(map);
+        if (follow) map.setView(ll, Math.max(map.getZoom(), 14));
+      } else dot.setLatLng(ll);
+      if (follow && R.status === 'live') map.panTo(ll, { animate: true });
+    } else if (dot) { map.removeLayer(dot); dot = null; }
   }
 }
 
