@@ -23,7 +23,7 @@
   var m = { '/admin': ['admin', 'Admin', 'yes'], '/race': ['race', 'Race Mode', 'no'] }[p];
   if (!m) return;
   document.getElementById('lnkManifest').href = '/manifest-' + m[0] + '.webmanifest';
-  document.getElementById('lnkIcon').href = '/icons/' + m[0] + '-touch-icon.png';
+  document.getElementById('lnkIcon').href = '/icons/' + m[0] + '-touch-icon.png?v=2';
   document.getElementById('metaTitle').content = m[1];
   document.getElementById('metaCapable').content = m[2];
   document.title = m[1];
