@@ -166,7 +166,7 @@ export default async function handler(req, res) {
         const r = await ntfy({
           title: 'Breakaway Test ✅',
           message: 'If this shows on your iPhone and Watch, cheers will too.',
-          tags: ['bicyclist'], priority: 4, click: `${origin}/#admin`
+          tags: ['bicyclist'], priority: 4, click: `${origin}/admin`
         });
         if (!r.ok) return send(res, 502, { error: `Push failed: ${r.error}` });
         break;

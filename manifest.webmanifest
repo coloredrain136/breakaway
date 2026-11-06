@@ -3,8 +3,8 @@
   "short_name": "Breakaway",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#05080d",
-  "theme_color": "#05080d",
+  "background_color": "#0a1220",
+  "theme_color": "#0a1220",
   "icons": [
     {
       "src": "/icons/icon-192.png",

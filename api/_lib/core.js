@@ -1,5 +1,5 @@
 // Breakaway shared server code. Files in api/_lib are not routes.
-export const APP_VERSION = 'breakaway-2';
+export const APP_VERSION = 'breakaway-3';
 import crypto from 'node:crypto';
 
 export const RACE_COLS = [
@@ -233,7 +233,7 @@ export async function flushPush(race, origin) {
   const delaySec = Math.round((sendAt - now) / 1000);
   const r = await ntfy({
     title, message, tags: ['bicyclist'], priority,
-    click: origin ? `${origin}/#race` : undefined,
+    click: origin ? `${origin}/race` : undefined,
     delay: delaySec >= 10 ? String(Math.floor(sendAt / 1000)) : undefined,
     attach, filename: attach ? `voice-${voice.id}.m4a` : undefined
   });
