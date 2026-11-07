@@ -265,7 +265,7 @@ ol.tips b{color:var(--ink)}
 <script src="/vendor/leaflet.js"></script>
 <script>
 'use strict';
-const APP_VERSION = 'breakaway-4';
+const APP_VERSION = 'breakaway-5';
 const QUICK = ['🔥', '👏', '💪', '🚴', '❄️'];
 const MI = 1609.344;
 if (navigator.standalone || matchMedia('(display-mode: standalone)').matches) document.documentElement.classList.add('standalone');
@@ -460,7 +460,7 @@ function Live(key) {
       <div class="msgbox"><input class="field grow" id="msg" maxlength="140" placeholder="Write a message…" enterkeyhint="send" autocomplete="off"><button class="btn mic" id="micBtn" aria-label="Record Voice Message">🎙️</button><button class="btn primary" id="sendBtn">Send</button></div>
       <div class="voicebox hidden" id="voiceBox"></div>
       <div class="row" style="justify-content:space-between;margin-top:6px"><span class="tiny" id="asName"></span><span class="tiny num" id="msgCount">0/140</span></div>
-      <p class="tiny" style="margin:10px 0 0">🔒 Your messages are private. Only you and <span class="rn">Joe</span> see them. Emoji taps are shared with everyone.</p>
+      <p class="tiny" style="margin:10px 0 0">🔒 Everything you send is private. Only you and <span class="rn">Joe</span> see it. Nobody else sees your taps, messages or voice.</p>
       <ul class="feed" id="feed"></ul>
     </div>
     <p class="tiny" style="text-align:center;margin-top:var(--s4)">GPS from his phone · not official timing · ${APP_VERSION}</p>
@@ -606,7 +606,7 @@ function Live(key) {
   function renderFeed() {
     const ul = $('#feed');
     const items = S.feed || [];
-    if (!items.length) { ul.innerHTML = `<li class="tiny" style="justify-content:center">No cheers yet. Be the first!</li>`; return; }
+    if (!items.length) { ul.innerHTML = `<li class="tiny" style="justify-content:center">Nothing sent yet. Your cheers show up here.</li>`; return; }
     const first = feedSeen.size === 0;
     ul.innerHTML = items.map((c) => {
       const who = c.name || 'Someone';
@@ -614,7 +614,7 @@ function Live(key) {
         : c.kind === 'voice' ? `🎙️ Voice message${c.audio_secs ? ` · ${Math.round(c.audio_secs)}s` : ''}`
         : `sent ${esc(c.emoji)}${c.count > 1 ? `×${c.count}` : ''}`;
       const isNew = !first && !feedSeen.has(c.id);
-      return `<li class="${isNew ? 'new' : ''}"><span class="av">${esc(who.slice(0, 1).toUpperCase())}</span><div class="grow"><span class="who">${esc(who)}</span> ${body}${c.mine ? `<div class="tiny">🔒 Only you and ${esc(S.rider || 'Joe')} see this</div>` : ''}</div><span class="when" data-t="${esc(c.created_at)}">${shortAgo(c.created_at)}</span></li>`;
+      return `<li class="${isNew ? 'new' : ''}"><span class="av">${esc(who.slice(0, 1).toUpperCase())}</span><div class="grow"><span class="who">${esc(who)}</span> ${body}</div><span class="when" data-t="${esc(c.created_at)}">${shortAgo(c.created_at)}</span></li>`;
     }).join('');
     items.forEach((c) => feedSeen.add(c.id));
   }

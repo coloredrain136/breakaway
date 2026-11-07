@@ -1,5 +1,5 @@
 // Breakaway shared server code. Files in api/_lib are not routes.
-export const APP_VERSION = 'breakaway-4';
+export const APP_VERSION = 'breakaway-5';
 import crypto from 'node:crypto';
 
 export const RACE_COLS = [

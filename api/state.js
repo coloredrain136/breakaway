@@ -1,7 +1,8 @@
 // GET /api/state?k=VIEW_KEY&since=<lastPointId>&epoch=<n>   → live state for the spectator page
 // GET /api/state?k=VIEW_KEY&part=course                     → the course line (fetched once)
 // GET /api/state?voice=<id>&sig=<sig>                        → one voice clip (signed link, used by ntfy)
-// Feed privacy: emoji taps are shared; messages + voice only come back to the device that sent them (&d=).
+// Feed privacy: everything (taps, messages, voice, tap counts) only comes back to the device that sent it (&d=).
+// Followers never see each other's cheers or that anyone else cheered. Admin + Race Mode see everything.
 import { db, getRace, send, same, flushPush, originOf, voiceSig, liveStats, APP_VERSION, PRE_WINDOW_MS } from './_lib/core.js';
 
 
@@ -51,15 +52,17 @@ export default async function handler(req, res) {
 
     const device = String(req.query.d || '').slice(0, 40);
     const cols = 'id,kind,emoji,count,name,text,created_at,audio_secs';
-    const [points, taps, mine, totals] = await Promise.all([
+    const mineQ = (q) => device.length >= 8
+      ? db('GET', `breakaway_cheers?race_id=eq.${race.id}&device=eq.${encodeURIComponent(device)}&${q}`)
+      : Promise.resolve([]);
+    const [points, mine, myTaps] = await Promise.all([
       showPoints ? db('GET', `breakaway_points?${ptFilter}&order=id.asc&limit=5000&select=id,lat,lon,ts`) : Promise.resolve([]),
-      db('GET', `breakaway_cheers?race_id=eq.${race.id}&hidden=eq.false&kind=eq.quick&order=id.desc&limit=40&select=${cols}`),
-      device.length >= 8
-        ? db('GET', `breakaway_cheers?race_id=eq.${race.id}&hidden=eq.false&kind=in.(msg,voice)&device=eq.${encodeURIComponent(device)}&order=id.desc&limit=40&select=${cols}`)
-        : Promise.resolve([]),
-      db('GET', `breakaway_cheer_totals?race_id=eq.${race.id}&select=emoji,total`)
+      mineQ(`hidden=eq.false&order=id.desc&limit=40&select=${cols}`),
+      mineQ(`kind=eq.quick&select=emoji,count&limit=5000`)
     ]);
-    const feed = [...taps, ...mine.map((m) => ({ ...m, mine: true }))].sort((a, b) => Number(b.id) - Number(a.id)).slice(0, 40);
+    const feed = mine.map((m) => ({ ...m, mine: true }));
+    const totals = {};
+    for (const t of myTaps) totals[t.emoji] = (totals[t.emoji] || 0) + (Number(t.count) || 1);
 
     const L = liveStats(race, now);
     const curVisible = L.curVisible;
@@ -88,7 +91,7 @@ export default async function handler(req, res) {
       feed,
       voiceOn: race.voice_on !== false,
       vapid: process.env.BREAKAWAY_VAPID_PUBLIC || null,
-      totals: Object.fromEntries(totals.map((t) => [t.emoji, t.total]))
+      totals
     });
   } catch (e) {
     console.error('state error', e.message);
