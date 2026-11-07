@@ -183,6 +183,20 @@ label.lbl{display:block;font-size:13px;color:var(--ink2);margin:var(--s3) 0 6px;
 .toast{position:fixed;left:50%;top:calc(var(--topPad) + 4px);transform:translateX(-50%);z-index:1100;padding:10px 16px;border-radius:var(--r4);background:rgba(16,26,40,.9);border:1px solid var(--stroke2);
   -webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);font-size:14px;font-weight:600;box-shadow:var(--shadow);max-width:90vw;text-align:center}
 .update{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 16px);transform:translateX(-50%);z-index:1100}
+/* ---------- Add to Home Screen sheet ---------- */
+.scrim.a2hs{padding-bottom:calc(env(safe-area-inset-bottom) + 46px)}
+.a2hs h3{margin:0 0 4px}
+.a2hs .perks{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 12px}
+.a2hs .perk{font-size:12.5px;font-weight:600;padding:5px 10px;border-radius:999px;background:rgba(127,214,255,.12);border:1px solid rgba(127,214,255,.25);color:#cdeeff}
+.a2hs .steps{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.a2hs .steps li{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.05);border:1px solid var(--stroke)}
+.a2hs .num{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-weight:750;font-size:13px;background:linear-gradient(180deg,#9fe2ff,#5cc4f2);color:#04131d}
+.a2hs .glyph{flex:none;width:34px;height:34px;border-radius:9px;display:grid;place-items:center;background:rgba(255,255,255,.08);color:#7fd6ff}
+.a2hs .glyph svg{width:20px;height:20px}
+.a2hs .st{font-size:14.5px;line-height:1.3}
+.a2hs .st small{display:block;color:var(--muted,#9fb0c3);font-size:12px;margin-top:2px}
+.a2hs .arrow{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 6px);transform:translateX(-50%);font-size:26px;animation:bob 1.2s ease-in-out infinite;z-index:1001;pointer-events:none}
+@keyframes bob{50%{transform:translate(-50%,6px)}}
 
 /* ---------- Admin ---------- */
 .kv{display:flex;justify-content:space-between;gap:var(--s3);padding:9px 0;border-top:1px solid rgba(255,255,255,.06);font-size:15px}
@@ -265,7 +279,7 @@ ol.tips b{color:var(--ink)}
 <script src="/vendor/leaflet.js"></script>
 <script>
 'use strict';
-const APP_VERSION = 'breakaway-5';
+const APP_VERSION = 'breakaway-6';
 const QUICK = ['🔥', '👏', '💪', '🚴', '❄️'];
 const MI = 1609.344;
 if (navigator.standalone || matchMedia('(display-mode: standalone)').matches) document.documentElement.classList.add('standalone');
@@ -707,6 +721,59 @@ function Live(key) {
     const fresh = await fetch(`/api/state?k=${encodeURIComponent(key)}&since=${lastId}&epoch=${epoch}&d=${deviceId()}`, { cache: 'no-store' }).then((r) => r.json()).catch(() => null);
     if (fresh && fresh.epoch === epoch) { for (const p of fresh.points || []) { trail.push([p[1], p[2]]); lastId = Math.max(lastId, p[0]); } localBump = {}; S = fresh; render(); }
   }
+
+  // ----- "Make this an app" sheet: shows once per phone after ~60s of use -----
+  let installEvt = null;
+  addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvt = e; });
+  function a2hsPlatform() {
+    const ua = navigator.userAgent;
+    if (navigator.standalone || matchMedia('(display-mode: standalone)').matches) return null;
+    const ios = /iPhone|iPod/.test(ua) || (/iPad|Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+    if (ios) return /CriOS|FxiOS|EdgiOS/.test(ua) ? 'ios-other' : 'ios-safari';
+    if (/Android/.test(ua)) return 'android';
+    return null; // computers: skip
+  }
+  const G = {
+    share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>',
+    add: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8.5v7M8.5 12h7"/></svg>',
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+    dots: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>'
+  };
+  function showA2HS() {
+    const plat = a2hsPlatform(); if (!plat) return;
+    const rn = esc(S?.rider || 'Joe');
+    const step = (n, g, t, sub) => `<li><span class="num">${n}</span><span class="glyph">${g}</span><span class="st">${t}${sub ? `<small>${sub}</small>` : ''}</span></li>`;
+    let steps, primary = 'Got It';
+    if (plat === 'ios-safari') steps = step(1, G.share, 'Tap <b>Share</b>', 'Bottom of Safari. Don’t see it? Tap <b>•••</b> first.') + step(2, G.add, 'Tap <b>Add to Home Screen</b>', 'You may need to scroll down a bit.') + step(3, G.check, 'Tap <b>Add</b>', 'Then open Breakaway from your home screen.');
+    else if (plat === 'ios-other') steps = step(1, G.share, 'Tap <b>Share</b>', 'In the address bar at the top.') + step(2, G.add, 'Tap <b>Add to Home Screen</b>', 'You may need to scroll down a bit.') + step(3, G.check, 'Tap <b>Add</b>', 'Then open Breakaway from your home screen.');
+    else if (installEvt) { steps = step(1, G.add, 'Tap <b>Add App</b> below', '') + step(2, G.check, 'Tap <b>Install</b>', 'Then open Breakaway from your home screen.'); primary = 'Add App'; }
+    else steps = step(1, G.dots, 'Tap the <b>⋮</b> menu', 'Top right of Chrome.') + step(2, G.add, 'Tap <b>Add to Home screen</b>', 'Or “Install app”.') + step(3, G.check, 'Tap <b>Add</b>', 'Then open Breakaway from your home screen.');
+    const sc = document.createElement('div'); sc.className = 'scrim a2hs';
+    sc.innerHTML = `<div class="card sheet"><h3>Hey! Want This as an App? 📲</h3>
+      <p class="sub" style="margin:0">Takes 10 seconds. Then ${rn}’s race is one tap away.</p>
+      <div class="perks"><span class="perk">Opens Full Screen</span><span class="perk">One Tap From Your Home Screen</span>${S?.vapid ? `<span class="perk">Push When ${rn} Starts</span>` : ''}</div>
+      <ol class="steps">${steps}</ol>
+      <div class="row" style="margin-top:14px"><button class="btn grow" id="aLater">Not Now</button><button class="btn primary grow" id="aOk">${primary}</button></div></div>
+      ${plat === 'ios-safari' ? '<div class="arrow">⬇️</div>' : ''}`;
+    document.body.appendChild(sc);
+    const close = () => sc.remove();
+    $('#aLater', sc).onclick = close;
+    sc.onclick = (e) => { if (e.target === sc) close(); };
+    $('#aOk', sc).onclick = async () => { if (installEvt) { try { installEvt.prompt(); await installEvt.userChoice; } catch {} installEvt = null; } close(); };
+  }
+  (function a2hsTimer() {
+    if (!a2hsPlatform() || store.get('ba_a2hs') === '1') return;
+    let used = 0;
+    const t = setInterval(() => {
+      if (document.hidden) return;
+      used++;
+      if (used < 60) return;
+      // wait for a calm moment: no other sheet open, not typing, not recording
+      const busy = document.querySelector('.scrim') || (document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName)) || document.querySelector('.rec, .recording');
+      if (busy) return;
+      clearInterval(t); store.set('ba_a2hs', '1'); showA2HS();
+    }, 1000);
+  })();
 
   // ----- "Notify me when Joe starts" (web push) -----
   let notifyKey = '';
