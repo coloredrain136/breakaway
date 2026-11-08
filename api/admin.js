@@ -4,10 +4,10 @@
 // GET ?voice=<id>          → one voice clip (audio bytes)
 // POST { action, v, ... }  → save | start | end | reopen | not_started | mute | voice | hide | played | test_push | clear_data
 import {
-  db, dbCount, getRace, patchRace, send, bodyOf, originOf, same, sleep, ntfy, liveStats, notifyFollowers, pushReady, APP_VERSION, MI
+  db, dbCount, getRace, patchRace, send, bodyOf, originOf, same, sleep, ntfy, liveStats, notifyFollowers, pushReady, pushOne, REACTIONS, APP_VERSION, MI
 } from './_lib/core.js';
 
-const ACTIONS = ['save', 'start', 'end', 'reopen', 'not_started', 'mute', 'voice', 'hide', 'played', 'test_push', 'clear_data', 'arm', 'golive', 'notify_test'];
+const ACTIONS = ['save', 'start', 'end', 'reopen', 'not_started', 'mute', 'voice', 'hide', 'played', 'test_push', 'clear_data', 'arm', 'golive', 'notify_test', 'react'];
 
 function cleanCourse(c) {
   if (!c || !Array.isArray(c.pts) || c.pts.length < 2 || c.pts.length > 20000) return null;
@@ -58,7 +58,7 @@ export default async function handler(req, res) {
       const since = Number(req.query.since || 0) || 0;
       const nowIso = new Date().toISOString();
       const [cheers] = await Promise.all([
-        db('GET', `breakaway_cheers?race_id=eq.${race.id}&hidden=eq.false&id=gt.${since}&order=id.desc&limit=200&select=id,kind,emoji,count,name,text,created_at,audio_secs,played_at`),
+        db('GET', `breakaway_cheers?race_id=eq.${race.id}&hidden=eq.false&id=gt.${since}&order=id.desc&limit=200&select=id,kind,emoji,count,name,text,created_at,audio_secs,played_at,reaction`),
         db('PATCH', `breakaway_races?id=eq.${race.id}`, { race_mode_seen_at: nowIso })
       ]);
       const L = liveStats(race);
@@ -80,7 +80,7 @@ export default async function handler(req, res) {
         dbCount(`breakaway_points?race_id=eq.${race.id}`),
         dbCount(`breakaway_points?race_id=eq.${race.id}&bad=eq.true`),
         db('GET', `breakaway_points?race_id=eq.${race.id}&order=received_at.desc&limit=1&select=ts,received_at,off_m,bad`),
-        db('GET', `breakaway_cheers?race_id=eq.${race.id}&order=id.desc&limit=300&select=id,kind,emoji,count,name,text,hidden,pushed,created_at,audio_secs,played_at`),
+        db('GET', `breakaway_cheers?race_id=eq.${race.id}&order=id.desc&limit=300&select=id,kind,emoji,count,name,text,hidden,pushed,created_at,audio_secs,played_at,reaction`),
         pushReady() ? dbCount(`breakaway_push_subs?race_id=eq.${race.id}`).catch(() => null) : Promise.resolve(null)
       ]);
       const trackUrl = `${origin}/api/track`;
@@ -188,6 +188,29 @@ export default async function handler(req, res) {
         if (!Number.isFinite(Number(b.id))) return send(res, 400, { error: 'bad id' });
         await db('PATCH', `breakaway_cheers?id=eq.${Number(b.id)}&race_id=eq.${race.id}`, { played_at: now });
         break;
+      case 'react': {
+        // Joe reacts to a cheer from Race Mode. Only the sender sees it (their feed), plus a push if they turned notifications on.
+        const id = Number(b.id);
+        if (!Number.isFinite(id)) return send(res, 400, { error: 'bad id' });
+        const emoji = b.emoji == null || b.emoji === '' ? null : String(b.emoji);
+        if (emoji && !REACTIONS.includes(emoji)) return send(res, 400, { error: 'bad reaction' });
+        const [c] = await db('GET', `breakaway_cheers?id=eq.${id}&race_id=eq.${race.id}&select=id,kind,emoji,count,text,device,reaction`);
+        if (!c) return send(res, 404, { error: 'Cheer not found' });
+        await db('PATCH', `breakaway_cheers?id=eq.${id}&race_id=eq.${race.id}`, { reaction: emoji, reacted_at: emoji ? new Date().toISOString() : null });
+        let notified = 0;
+        if (emoji && emoji !== c.reaction && c.device && pushReady()) {
+          const subs = await db('GET', `breakaway_push_subs?race_id=eq.${race.id}&device=eq.${encodeURIComponent(c.device)}&select=id,endpoint,p256dh,auth`).catch(() => []);
+          const rn = race.rider_name || 'Joe';
+          const what = c.kind === 'msg' ? 'your message' : c.kind === 'voice' ? 'your voice message' : 'your cheer';
+          const body = c.kind === 'msg' ? `“${String(c.text || '').slice(0, 80)}”` : c.kind === 'voice' ? '🎙️ Voice message' : `${c.emoji}${c.count > 1 ? '×' + c.count : ''}`;
+          const url = `${origin}/?k=${encodeURIComponent(process.env.BREAKAWAY_VIEW_KEY || '')}`;
+          await Promise.all(subs.map(async (s) => {
+            try { await pushOne(s, `${rn} ${emoji} ${what}`, body, url, `breakaway-rx-${id}`); notified++; }
+            catch (e) { if (e && (e.statusCode === 404 || e.statusCode === 410)) await db('DELETE', `breakaway_push_subs?id=eq.${s.id}`).catch(() => {}); }
+          }));
+        }
+        return send(res, 200, { ok: true, reaction: emoji, notified });
+      }
       case 'hide':
         if (!Number.isFinite(Number(b.id))) return send(res, 400, { error: 'bad id' });
         await db('PATCH', `breakaway_cheers?id=eq.${Number(b.id)}&race_id=eq.${race.id}`, { hidden: !!b.hidden });

@@ -51,7 +51,7 @@ export default async function handler(req, res) {
     const showPoints = status !== 'not_started' || (planned != null && now >= planned - PRE_WINDOW_MS);
 
     const device = String(req.query.d || '').slice(0, 40);
-    const cols = 'id,kind,emoji,count,name,text,created_at,audio_secs';
+    const cols = 'id,kind,emoji,count,name,text,created_at,audio_secs,reaction,reacted_at';
     const mineQ = (q) => device.length >= 8
       ? db('GET', `breakaway_cheers?race_id=eq.${race.id}&device=eq.${encodeURIComponent(device)}&${q}`)
       : Promise.resolve([]);

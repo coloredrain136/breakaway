@@ -1,5 +1,5 @@
 // Breakaway shared server code. Files in api/_lib are not routes.
-export const APP_VERSION = 'breakaway-6';
+export const APP_VERSION = 'breakaway-7';
 import crypto from 'node:crypto';
 
 export const RACE_COLS = [
@@ -11,6 +11,8 @@ export const RACE_COLS = [
 ].join(',');
 
 export const QUICK_EMOJI = ['🔥', '👏', '💪', '🚴', '❄️'];
+export const REACTIONS = ['❤️', '👍', '😂', '🙌'];
+export const VOICE_MAX_SECS = 30;
 export const PRE_WINDOW_MS = 30 * 60 * 1000;   // points kept from 30 min before planned start
 export const POST_WINDOW_MS = 2 * 60 * 1000;   // and 2 min after finish
 export const PUSH_GAP_MS = 2 * 60 * 1000;      // max one push per 2 min
@@ -336,8 +338,8 @@ export async function notifyFollowers(race, origin, kind) {
   return out;
 }
 
-export async function pushOne(sub, title, body, url) {
+export async function pushOne(sub, title, body, url, tag = 'breakaway-test') {
   const wp = await webpush();
   return wp.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-    JSON.stringify({ title, body, url, tag: 'breakaway-test' }), { TTL: 600, urgency: 'high', timeout: 8000 });
+    JSON.stringify({ title, body, url, tag }), { TTL: 600, urgency: 'high', timeout: 8000 });
 }

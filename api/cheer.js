@@ -1,5 +1,5 @@
 // POST /api/cheer  { k, v, device, name, kind: 'quick'|'msg'|'voice', emoji, count, text, audio (base64), mime, secs }
-import { db, getRace, patchRace, send, bodyOf, same, ipOf, originOf, flushPush, APP_VERSION, QUICK_EMOJI, VOICE_MAX_BYTES, VOICE_MIMES } from './_lib/core.js';
+import { db, getRace, patchRace, send, bodyOf, same, ipOf, originOf, flushPush, APP_VERSION, QUICK_EMOJI, VOICE_MAX_BYTES, VOICE_MAX_SECS, VOICE_MIMES } from './_lib/core.js';
 
 const clean = (s, n) => String(s || '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n);
 
@@ -28,9 +28,9 @@ export default async function handler(req, res) {
     const audio = typeof b.audio === 'string' ? b.audio.replace(/^data:[^,]*,/, '') : '';
     const bytes = Math.floor(audio.length * 3 / 4);
     if (bytes < 800) return send(res, 400, { error: 'That recording was empty' });
-    if (bytes > VOICE_MAX_BYTES) return send(res, 400, { error: 'Voice messages can be 15 seconds max' });
+    if (bytes > VOICE_MAX_BYTES) return send(res, 400, { error: `Voice messages can be ${VOICE_MAX_SECS} seconds max` });
     if (!/^[A-Za-z0-9+/=]+$/.test(audio)) return send(res, 400, { error: 'Bad audio' });
-    row.audio_secs = Math.max(0.5, Math.min(16, Number(b.secs) || 0));
+    row.audio_secs = Math.max(0.5, Math.min(VOICE_MAX_SECS + 1, Number(b.secs) || 0));
     row._voice = { mime, data: audio };
   } else {
     if (!QUICK_EMOJI.includes(b.emoji)) return send(res, 400, { error: 'bad emoji' });

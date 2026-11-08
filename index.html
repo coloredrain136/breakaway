@@ -176,6 +176,16 @@ label.lbl{display:block;font-size:13px;color:var(--ink2);margin:var(--s3) 0 6px;
 @keyframes fadein{from{opacity:0;transform:translateY(-4px)}}
 .feed .hid{opacity:.45;text-decoration:line-through}
 
+/* ---------- Reactions ---------- */
+.rxrow{display:flex;gap:6px;margin-top:8px}
+.rxb{flex:1;min-height:40px;border-radius:12px;border:1px solid var(--stroke);background:rgba(255,255,255,.05);font-size:20px;line-height:1;display:grid;place-items:center;-webkit-tap-highlight-color:transparent;transition:transform .12s,background .15s,border-color .15s}
+.rxb:active{transform:scale(.9)}
+.rxb.on{background:rgba(127,214,255,.2);border-color:rgba(127,214,255,.6);box-shadow:0 0 0 2px rgba(127,214,255,.18)}
+.rm-banner .rxrow{margin-top:10px}.rm-banner .rxb{min-height:52px;font-size:24px}
+.rxchip{display:inline-flex;align-items:center;gap:4px;margin-top:6px;padding:3px 10px;border-radius:999px;font-size:13px;font-weight:600;background:rgba(127,214,255,.12);border:1px solid rgba(127,214,255,.3);color:#cdeeff}
+.rxchip.pop{animation:rxpop .5s ease}
+@keyframes rxpop{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.15)}100%{transform:scale(1)}}
+
 /* ---------- Sheet / toast ---------- */
 .scrim{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center;padding:var(--s4) var(--s4) calc(env(safe-area-inset-bottom) + var(--s4))}
 .sheet{width:100%;max-width:520px;animation:up .25s ease}
@@ -279,7 +289,17 @@ ol.tips b{color:var(--ink)}
 <script src="/vendor/leaflet.js"></script>
 <script>
 'use strict';
-const APP_VERSION = 'breakaway-6';
+const APP_VERSION = 'breakaway-7';
+const VOICE_SECS = 30;
+const REACTIONS = ['❤️', '👍', '😂', '🙌'];
+// Haptic tap: Android uses vibrate; iPhone Safari (iOS 18+) gives a haptic when a switch checkbox is toggled by a tap.
+const haptic = (() => { let lbl = null; return () => {
+  try {
+    if (navigator.vibrate) { navigator.vibrate(12); return; }
+    if (!lbl) { lbl = document.createElement('label'); lbl.setAttribute('aria-hidden', 'true'); lbl.style.cssText = 'position:fixed;left:-200px;top:0;width:1px;height:1px;overflow:hidden;opacity:0'; lbl.innerHTML = '<input type="checkbox" switch tabindex="-1">'; document.body.appendChild(lbl); }
+    lbl.click();
+  } catch {}
+}; })();
 const QUICK = ['🔥', '👏', '💪', '🚴', '❄️'];
 const MI = 1609.344;
 if (navigator.standalone || matchMedia('(display-mode: standalone)').matches) document.documentElement.classList.add('standalone');
@@ -441,7 +461,7 @@ function Landing() {
 function Live(key) {
   let S = null, course = null, courseVer = -1, trail = [], lastId = 0, epoch = 0;
   let follow = true, firstFit = false, zoomedToRider = false, timer = null, inflight = false, failCount = 0;
-  let pendingTaps = {}, tapTimer = null, localBump = {}, feedSeen = new Set(), msgCooldownUntil = 0;
+  let pendingTaps = {}, tapTimer = null, localBump = {}, feedSeen = new Set(), rxSeen = null, msgCooldownUntil = 0;
   let name = store.get('ba_name') || '';
 
   $('#app').innerHTML = `<div class="wrap">
@@ -628,9 +648,16 @@ function Live(key) {
         : c.kind === 'voice' ? `🎙️ Voice message${c.audio_secs ? ` · ${Math.round(c.audio_secs)}s` : ''}`
         : `sent ${esc(c.emoji)}${c.count > 1 ? `×${c.count}` : ''}`;
       const isNew = !first && !feedSeen.has(c.id);
-      return `<li class="${isNew ? 'new' : ''}"><span class="av">${esc(who.slice(0, 1).toUpperCase())}</span><div class="grow"><span class="who">${esc(who)}</span> ${body}</div><span class="when" data-t="${esc(c.created_at)}">${shortAgo(c.created_at)}</span></li>`;
+      const rxNew = c.reaction && rxSeen && rxSeen.get(c.id) !== c.reaction;
+      const rx = c.reaction ? `<div><span class="rxchip${rxNew ? ' pop' : ''}">${esc(S.rider || 'Joe')} ${esc(c.reaction)}</span></div>` : '';
+      return `<li class="${isNew ? 'new' : ''}"><span class="av">${esc(who.slice(0, 1).toUpperCase())}</span><div class="grow"><span class="who">${esc(who)}</span> ${body}${rx}</div><span class="when" data-t="${esc(c.created_at)}">${shortAgo(c.created_at)}</span></li>`;
     }).join('');
     items.forEach((c) => feedSeen.add(c.id));
+    if (rxSeen) {
+      const fresh = items.find((c) => c.reaction && rxSeen.get(c.id) !== c.reaction);
+      if (fresh) { toast(`${S.rider || 'Joe'} ${fresh.reaction} ${fresh.kind === 'msg' ? 'your message' : fresh.kind === 'voice' ? 'your voice message' : 'your cheer'}`, 3500); haptic(); }
+    }
+    rxSeen = new Map(items.map((c) => [c.id, c.reaction || null]));
   }
 
   function tick() {
@@ -833,7 +860,7 @@ function Live(key) {
     store.del('ba_push'); notifyKey = ''; renderNotify(); toast('Notifications off');
   }
 
-  // ----- voice messages (15 s max) -----
+  // ----- voice messages (30 s max) -----
   let rec = null, recChunks = [], recStart = 0, recTimer = null, recBlob = null, recSecs = 0, voiceCooldownUntil = 0;
   const micBtn = $('#micBtn'), vbox = $('#voiceBox');
   micBtn.onclick = async () => {
@@ -852,7 +879,7 @@ function Live(key) {
     rec.ondataavailable = (e) => { if (e.data && e.data.size) recChunks.push(e.data); };
     rec.onstop = () => {
       stream.getTracks().forEach((t) => t.stop());
-      recSecs = Math.min(15, (Date.now() - recStart) / 1000);
+      recSecs = Math.min(VOICE_SECS, (Date.now() - recStart) / 1000);
       recBlob = new Blob(recChunks, { type: (rec.mimeType || want || 'audio/mp4').split(';')[0] });
       if (recSecs < 0.8 || recBlob.size < 800) { vbox.classList.add('hidden'); vbox.innerHTML = ''; toast('Too short. Hold on a sec longer.'); return; }
       showPreview();
@@ -860,14 +887,14 @@ function Live(key) {
     rec.start(250); recStart = Date.now();
     micBtn.textContent = '■'; micBtn.classList.add('danger');
     vbox.classList.remove('hidden');
-    vbox.innerHTML = `<div class="rec"><span class="recdot"></span><span>Recording</span><span class="num" id="recT" style="margin-left:auto">0:00 / 0:15</span></div>
+    vbox.innerHTML = `<div class="rec"><span class="recdot"></span><span>Recording</span><span class="num" id="recT" style="margin-left:auto">0:00 / 0:${VOICE_SECS}</span></div>
       <div class="vbar"><i id="recBar"></i></div><button class="btn danger block" id="recStop">Stop</button>`;
     $('#recStop').onclick = stopRec;
     recTimer = setInterval(() => {
       const t = (Date.now() - recStart) / 1000;
-      const el = $('#recT'); if (el) el.textContent = `0:${String(Math.min(15, Math.floor(t))).padStart(2, '0')} / 0:15`;
-      const bar = $('#recBar'); if (bar) bar.style.width = Math.min(100, t / 15 * 100) + '%';
-      if (t >= 15) stopRec();
+      const el = $('#recT'); if (el) el.textContent = `0:${String(Math.min(VOICE_SECS, Math.floor(t))).padStart(2, '0')} / 0:${VOICE_SECS}`;
+      const bar = $('#recBar'); if (bar) bar.style.width = Math.min(100, t / VOICE_SECS * 100) + '%';
+      if (t >= VOICE_SECS) stopRec();
     }, 250);
   };
   function stopRec() {
@@ -1047,7 +1074,7 @@ function Admin() {
 
     // ---- watch ----
     $('#cWatch').innerHTML = `<h2>Cheers to Watch</h2>
-      <div class="toggle"><div><div style="font-weight:650">Voice Messages</div><div class="tiny">Followers can send 15s clips. Race Mode plays them out loud.</div></div>
+      <div class="toggle"><div><div style="font-weight:650">Voice Messages</div><div class="tiny">Followers can send 30s clips. Race Mode plays them out loud.</div></div>
         <label class="sw ok"><input type="checkbox" id="voiceOn" ${R.voice_on !== false ? 'checked' : ''}><span></span></label></div>
       <div class="toggle"><div><div style="font-weight:650">Mute Cheers to Watch</div><div class="tiny">Cheers still save and show on the page.</div></div>
         <label class="sw"><input type="checkbox" id="mute" ${R.mute ? 'checked' : ''}><span></span></label></div>
@@ -1461,7 +1488,8 @@ function RaceMode() {
     if (!c) { b.className = 'rm-banner'; b.innerHTML = `<span class="av">💬</span><div class="grow"><div class="rm-k">Cheers</div><div class="rm-bt" style="color:var(--ink2)">None yet. They’ll show up here.</div></div>`; return; }
     const body = c.kind === 'msg' ? esc(c.text) : c.kind === 'voice' ? `🎙️ Voice message${c.audio_secs ? ` · ${Math.round(c.audio_secs)}s` : ''}` : `${esc(c.emoji)}${c.count > 1 ? `×${c.count}` : ''}`;
     b.className = 'rm-banner' + (flashId === c.id ? ' flash' : '');
-    b.innerHTML = `<span class="av">${esc((c.name || 'S').slice(0, 1).toUpperCase())}</span><div class="grow"><div class="rm-k">${esc(c.name || 'Someone')} · ${shortAgo(c.created_at)} ago</div><div class="rm-bt">${body}</div></div>`;
+    b.innerHTML = `<span class="av">${esc((c.name || 'S').slice(0, 1).toUpperCase())}</span><div class="grow"><div class="rm-k">${esc(c.name || 'Someone')} · ${shortAgo(c.created_at)} ago</div><div class="rm-bt">${body}</div>${rxRow(c)}</div>`;
+    wireRx(b);
     if (flashId === c.id) setTimeout(() => { flashId = null; b.classList.remove('flash'); }, 8000);
   }
   function paintChecks(el) {
@@ -1499,6 +1527,19 @@ function RaceMode() {
     $('#rmTest').onclick = () => { const a = new Audio(CHIME); a.play().catch(() => {}); };
     if ($('#rmStop')) $('#rmStop').onclick = stopAudio;
   }
+  // ----- reactions: tap to react, tap again to clear. Sender sees it on their screen (+ push if they turned notifications on).
+  function rxRow(c) { return `<div class="rxrow">${REACTIONS.map((e) => `<button class="rxb${c.reaction === e ? ' on' : ''}" data-rx="${c.id}" data-e="${e}" aria-label="React ${e}">${e}</button>`).join('')}</div>`; }
+  function wireRx(root) { root.querySelectorAll('[data-rx]').forEach((btn) => btn.onclick = (ev) => { ev.stopPropagation(); react(Number(btn.dataset.rx), btn.dataset.e); }); }
+  async function react(id, e) {
+    const c = items.find((x) => x.id === id); if (!c) return;
+    haptic();
+    const prev = c.reaction || null, next = prev === e ? null : e;
+    c.reaction = next; paintBanner(); paintFeed();
+    try {
+      const j = await api('POST', '', { action: 'react', id, emoji: next });
+      if (next) toast(j.notified ? `${next} sent · ${c.name || 'They'} got a push` : `${next} sent`, 1800);
+    } catch (err) { c.reaction = prev; paintBanner(); paintFeed(); toast(err.message || 'Couldn’t react'); }
+  }
   function paintFeed() {
     const ul = $('#rmFeed'); if (!ul) return;
     if (!items.length) { ul.innerHTML = `<li class="tiny" style="justify-content:center">No cheers yet.</li>`; return; }
@@ -1510,8 +1551,9 @@ function RaceMode() {
         const state = playing === c.id ? '🔊 Playing' : failed.has(c.id) ? 'Couldn’t play' : c.played_at ? 'Played' : 'New';
         body = `<div class="row" style="margin-top:4px"><span>🎙️ ${c.audio_secs ? Math.round(c.audio_secs) + 's' : 'Voice'} · ${state}</span><button class="btn" style="min-height:34px;font-size:13px;margin-left:auto" data-rplay="${c.id}">Play</button></div>`;
       } else body = `<span>${esc(c.emoji)}${c.count > 1 ? `×${c.count}` : ''}</span>`;
-      return `<li><span class="av">${esc((c.name || 'S').slice(0, 1).toUpperCase())}</span><div class="grow"><span class="who">${who}</span> <span class="when" style="float:right">${shortAgo(c.created_at)}</span>${body}</div></li>`;
+      return `<li><span class="av">${esc((c.name || 'S').slice(0, 1).toUpperCase())}</span><div class="grow"><span class="who">${who}</span> <span class="when" style="float:right">${shortAgo(c.created_at)}</span>${body}${rxRow(c)}</div></li>`;
     }).join('');
+    wireRx(ul);
     ul.querySelectorAll('[data-rplay]').forEach((b) => b.onclick = () => { const it = items.find((c) => String(c.id) === b.dataset.rplay); if (it) playNow(it.id); });
   }
   function paintMap() {
